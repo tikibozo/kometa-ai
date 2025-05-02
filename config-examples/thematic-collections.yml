@@ -1,0 +1,73 @@
+collections:
+  # === KOMETA-AI ===
+  # enabled: true
+  # prompt: |
+  #   Identify coming-of-age films based on these criteria:
+  #   - Centers on a young protagonist's transition from childhood/adolescence to adulthood
+  #   - Features a character's psychological, moral, spiritual, or emotional growth
+  #   - Includes significant moments of self-discovery or realization
+  #   - Often includes themes of:
+  #     - Identity formation and self-discovery
+  #     - First romantic or sexual experiences
+  #     - Changing relationships with family or authority figures
+  #     - Growing awareness of social realities or adult complexities
+  #     - Struggles with responsibility and independence
+  #   - Can be from any time period or country, but must focus on the maturation process
+  #   - May feature common coming-of-age settings like high school, college, or summer experiences
+  # confidence_threshold: 0.75
+  # === END KOMETA-AI ===
+  Coming of Age:
+    plex_search:
+      any:
+        genre: Drama
+
+  # === KOMETA-AI ===
+  # enabled: true
+  # prompt: |
+  #   Identify dystopian future films based on these criteria:
+  #   - Set in a fictional future society characterized by oppressive social control
+  #   - Society must be fundamentally flawed, dehumanizing, or undesirable despite possible utopian appearances
+  #   - Features one or more dystopian elements:
+  #     - Totalitarian government or corporate control
+  #     - Environmental devastation
+  #     - Technological domination or surveillance
+  #     - Loss of individualism or forced conformity
+  #     - Class division or social inequality taken to extremes
+  #     - Restricted freedoms or thought control
+  #   - Usually includes themes of resistance, escape, or questioning the established order
+  #   - Story typically follows characters who recognize the dystopian nature of their society
+  #   - May contain cautionary messages about current social, political, or technological trends
+  # confidence_threshold: 0.8
+  # === END KOMETA-AI ===
+  Dystopian Futures:
+    plex_search:
+      any:
+        genre: 
+          - Science Fiction
+          - Thriller
+
+  # === KOMETA-AI ===
+  # enabled: true
+  # prompt: |
+  #   Identify time loop/time paradox films based on these criteria:
+  #   - Features characters experiencing time in a non-linear way:
+  #     - Time loops where the same period repeats (like "Groundhog Day")
+  #     - Causal loops where effect precedes cause
+  #     - Bootstrap paradoxes where information has no origin
+  #     - Temporal displacement with significant consequences
+  #   - Central plot revolves around the time anomaly (not just a minor plot device)
+  #   - Characters attempting to understand, navigate, or escape time distortions
+  #   - Often explores themes of:
+  #     - Personal growth through repetition
+  #     - Fate versus free will
+  #     - Consequences of changing the past
+  #     - Memory and identity across different timelines
+  #   - May include scientifically rigorous or more fantastical approaches to time mechanics
+  # confidence_threshold: 0.8
+  # === END KOMETA-AI ===
+  Time Loops and Paradoxes:
+    plex_search:
+      any:
+        genre: 
+          - Science Fiction
+          - Fantasy

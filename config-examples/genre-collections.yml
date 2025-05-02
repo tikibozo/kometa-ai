@@ -1,0 +1,53 @@
+collections:
+  # === KOMETA-AI ===
+  # enabled: true
+  # prompt: |
+  #   Identify sci-fi comedy movies based on these criteria:
+  #   - Primary genre must be science fiction with significant comedic elements
+  #   - Includes humorous takes on science fiction concepts like aliens, time travel, or future technology
+  #   - Characters often react to bizarre sci-fi situations in comedic ways
+  #   - Usually more focused on entertainment than serious scientific accuracy
+  #   - Tone is primarily light and humorous rather than dark or suspenseful
+  # confidence_threshold: 0.75
+  # === END KOMETA-AI ===
+  Sci-Fi Comedy:
+    plex_search:
+      all:
+        genre: Science Fiction
+      any:
+        genre: Comedy
+
+  # === KOMETA-AI ===
+  # enabled: true
+  # prompt: |
+  #   Identify psychological horror movies based on these criteria:
+  #   - Focus on mental, emotional, or psychological states to frighten viewers
+  #   - Often deals with themes of madness, paranoia, or losing grip on reality
+  #   - More concerned with disturbing the viewer than with explicit gore or violence
+  #   - Usually builds tension through atmosphere, unreliable narration, or creeping dread
+  #   - May feature unreliable protagonists or ambiguous endings
+  #   - Often explores inner fears, traumas, or psychosis
+  # confidence_threshold: 0.8
+  # === END KOMETA-AI ===
+  Psychological Horror:
+    plex_search:
+      all:
+        genre: Horror
+
+  # === KOMETA-AI ===
+  # enabled: true
+  # prompt: |
+  #   Identify action thrillers based on these criteria:
+  #   - Combines elements of the action genre (physical stunts, fights, chases, explosions) with thriller elements
+  #   - Maintains high tension and suspense throughout
+  #   - Usually features a protagonist fighting against time or working to prevent a catastrophic event
+  #   - Often includes conspiracy elements, betrayals, or high-stakes missions
+  #   - Typically has a faster pace and more complex plot than pure action films
+  # confidence_threshold: 0.7
+  # === END KOMETA-AI ===
+  Action Thrillers:
+    plex_search:
+      all:
+        genre: Action
+      any:
+        genre: Thriller

@@ -1,0 +1,65 @@
+collections:
+  # === KOMETA-AI ===
+  # enabled: true
+  # prompt: |
+  #   Identify defining 80s movies based on these criteria:
+  #   - Released primarily between 1980-1989
+  #   - Captures the aesthetic, culture, or zeitgeist of the 1980s:
+  #     - Fashion trends like neon colors, big hair, leg warmers
+  #     - Technology of the era (early computers, Walkmans, arcade games)
+  #     - Cold War themes or Reagan-era politics
+  #     - Popular music of the time or music video aesthetics
+  #   - Had significant cultural impact or represented 80s trends
+  #   - Recognized as iconic or representative of the decade
+  #   - May feature teen or coming-of-age storylines common to the era
+  #   - Could include genre films particularly associated with 80s (teen comedies, slashers, action blockbusters)
+  # confidence_threshold: 0.75
+  # === END KOMETA-AI ===
+  Defining 80s Movies:
+    plex_search:
+      all:
+        year: 1980-1989
+
+  # === KOMETA-AI ===
+  # enabled: true
+  # prompt: |
+  #   Identify classic Hollywood Golden Age films based on these criteria:
+  #   - Released approximately between 1930-1959, focusing on the studio system era
+  #   - Produced by major Hollywood studios (MGM, Warner Bros., Paramount, RKO, etc.)
+  #   - Exemplifies the classical Hollywood style:
+  #     - Strong narrative continuity and clarity
+  #     - Invisible editing techniques
+  #     - Star-driven with major celebrities of the era
+  #     - Studio production values and craftsmanship
+  #   - Made significant impact on film history or popular culture
+  #   - Features recognizable stars from the period (Humphrey Bogart, Katharine Hepburn, James Stewart, etc.)
+  #   - Represents genres particularly associated with the era (screwball comedies, film noir, musicals)
+  #   - Give higher confidence to critically acclaimed classics or films that won major Academy Awards
+  # confidence_threshold: 0.8
+  # === END KOMETA-AI ===
+  Hollywood Golden Age:
+    plex_search:
+      all:
+        year: 1930-1959
+
+  # === KOMETA-AI ===
+  # enabled: true
+  # prompt: |
+  #   Identify New Hollywood/American New Wave films based on these criteria:
+  #   - Released approximately between 1967-1980
+  #   - Represents the shift from classical Hollywood to more experimental, director-driven cinema
+  #   - Demonstrates influence from European art cinema or countercultural movements
+  #   - Shows characteristics of the period:
+  #     - Morally ambiguous protagonists or antiheroes
+  #     - Experimental techniques (jump cuts, montages, naturalistic dialogue)
+  #     - More adult themes and content after the end of the Production Code
+  #     - Cynical or questioning approach to American society and institutions
+  #     - Focus on personal, character-driven stories over plot
+  #   - Directed by key figures of the movement (Scorsese, Coppola, Altman, etc.)
+  #   - Made significant cultural impact or influenced later filmmakers
+  # confidence_threshold: 0.75
+  # === END KOMETA-AI ===
+  New Hollywood Cinema:
+    plex_search:
+      all:
+        year: 1967-1980

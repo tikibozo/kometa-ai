@@ -1,0 +1,63 @@
+collections:
+  # === KOMETA-AI ===
+  # enabled: true
+  # prompt: |
+  #   Identify Christopher Nolan's best works based on these criteria:
+  #   - Films directed by Christopher Nolan
+  #   - Demonstrates Nolan's signature style: complex narrative structure, practical effects, themes of time/memory/identity
+  #   - Highly rated by critics and audiences (generally 80%+ on review aggregators)
+  #   - Shows innovation in storytelling or technical achievement
+  #   - Makes significant cultural impact or advances Nolan's artistic development
+  #   - Include all Nolan films but give higher confidence scores to his most acclaimed and representative works
+  # confidence_threshold: 0.7
+  # === END KOMETA-AI ===
+  Christopher Nolan's Best:
+    plex_search:
+      all:
+        director: Christopher Nolan
+
+  # === KOMETA-AI ===
+  # enabled: true
+  # prompt: |
+  #   Identify films in the style of Alfred Hitchcock based on these criteria:
+  #   - Directed by Alfred Hitchcock himself OR clearly influenced by Hitchcock's style
+  #   - Features signature Hitchcock elements:
+  #     - Suspense built through audience knowledge not shared by characters
+  #     - Themes of guilt, mistaken identity, or pursuit
+  #     - Voyeurism or observation as a plot element
+  #     - MacGuffin plot devices
+  #     - Elaborate set pieces centered around familiar locations
+  #     - "Wrong man" scenarios or ordinary people in extraordinary situations
+  #     - Distinctive camera techniques (dolly zoom, extended takes, POV shots)
+  #   - For non-Hitchcock films, must show clear intentional homage to his style
+  # confidence_threshold: 0.75
+  # === END KOMETA-AI ===
+  Hitchcockian Thrillers:
+    plex_search:
+      any:
+        director: Alfred Hitchcock
+        genre: Thriller
+
+  # === KOMETA-AI ===
+  # enabled: true
+  # prompt: |
+  #   Identify Wes Anderson's visually distinctive films based on these criteria:
+  #   - Directed by Wes Anderson
+  #   - Features Anderson's signature visual style:
+  #     - Symmetrical composition and flat space camera moves
+  #     - Carefully designed and detailed production design
+  #     - Distinctive color palettes (often pastel or vibrant colors)
+  #     - Deliberate, composed tracking shots and slow-motion sequences
+  #     - Careful attention to typography and text elements
+  #     - Tableau-like staging of scenes
+  #   - Exhibits Anderson's thematic interests:
+  #     - Dysfunctional families or surrogate family groups
+  #     - Characters with specific quirks and obsessions
+  #     - Deadpan humor and melancholy undertones
+  #   - Give higher confidence to films that most strongly exhibit Anderson's visual style
+  # confidence_threshold: 0.8
+  # === END KOMETA-AI ===
+  Wes Anderson Collection:
+    plex_search:
+      all:
+        director: Wes Anderson

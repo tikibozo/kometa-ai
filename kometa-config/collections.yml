@@ -1,0 +1,32 @@
+collections:
+  # === KOMETA-AI ===
+  # enabled: true
+  # confidence_threshold: 0.7
+  # prompt: |
+  #   Identify film noir movies based on these criteria:
+  #   - Made primarily between 1940-1959
+  #   - Dark, cynical themes and moral ambiguity
+  #   - Visual style emphasizing shadows, unusual angles
+  #   - Crime or detective storylines
+  #   - Femme fatale character often present
+  # === END KOMETA-AI ===
+  Film Noir:
+    plex_search:
+      all:
+        genre: Film-Noir
+
+  # === KOMETA-AI ===
+  # enabled: true
+  # confidence_threshold: 0.8
+  # priority: 1
+  # prompt: |
+  #   Identify heist movies based on these criteria:
+  #   - Focus on planning and executing a theft or robbery
+  #   - Usually includes assembling a team of specialists
+  #   - Contains scenes of planning, preparation, and execution
+  #   - Often includes twists or complications during the heist
+  # === END KOMETA-AI ===
+  Heist Movies:
+    plex_search:
+      all:
+        genre: Crime

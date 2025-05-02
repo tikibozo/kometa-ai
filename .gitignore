@@ -1,0 +1,84 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+*.bak
+*.back
+*.orig
+
+# Environment files
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Logs
+logs/
+*.log
+
+# State files
+state/
+
+# Test data
+test_data/
+old_scripts/
+fix_*.py
+test_parser.py
+parser_test.py
+*_parser_test.py
+
+# Test coverage
+.coverage
+htmlcov/
+coverage.xml
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker
+.docker/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# mypy
+.mypy_cache/
+
+# pytest
+.pytest_cache/
+
+# tox
+.tox/
+
+# Generated data
+*.json
+optimization_results_*.json
+profile_results.json
+batch_size_optimization.json
+
+# Claude settings
+**/.claude/settings.local.json

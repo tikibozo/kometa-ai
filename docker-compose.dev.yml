@@ -1,0 +1,23 @@
+services:
+  kometa-ai:
+    build: 
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./:/app
+      - ./test_data/kometa-config:/app/kometa-config
+      - ./test_data/state:/app/state
+      - ./logs:/app/logs
+    environment:
+      - RADARR_URL=http://mock-radarr:7878
+      - RADARR_API_KEY=dev_api_key
+      - CLAUDE_API_KEY=dev_api_key
+      - DEBUG_LOGGING=true
+    command: ["--run-now", "--dry-run"]
+  
+  mock-radarr:
+    image: mockserver/mockserver
+    ports:
+      - "7878:1080"
+    volumes:
+      - ./test_data/mock_radarr:/mockserver/mockserver_expectations

@@ -1,0 +1,35 @@
+services:
+  kometa-ai:
+    image: kometa-ai:latest
+    container_name: kometa-ai
+    volumes:
+      - ./kometa-config:/app/kometa-config
+      - ./state:/app/state
+      - ./logs:/app/logs
+    environment:
+      - RADARR_URL=http://radarr:7878
+      - RADARR_API_KEY=your_radarr_api_key
+      - CLAUDE_API_KEY=your_claude_api_key
+      - DEBUG_LOGGING=false
+      - SCHEDULE_INTERVAL=1d
+      - SCHEDULE_START_TIME=03:00
+      - TZ=America/New_York
+      - SMTP_SERVER=smtp.example.com
+      - SMTP_PORT=587
+      - SMTP_USERNAME=your_username
+      - SMTP_PASSWORD=your_password
+      - SMTP_USE_TLS=true
+      - NOTIFICATION_RECIPIENTS=user@example.com
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-m", "kometa_ai", "--health-check"]
+      interval: 5m
+      timeout: 30s
+      retries: 3
+      start_period: 1m
+    networks:
+      - kometa-network
+
+networks:
+  kometa-network:
+    external: true

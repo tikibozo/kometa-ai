@@ -1,0 +1,29 @@
+services:
+  kometa-ai:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: kometa-ai-test
+    volumes:
+      - /tmp/kometa_ai_test/kometa-config:/app/kometa-config
+      - /tmp/kometa_ai_test/state:/app/state
+      - /tmp/kometa_ai_test/logs:/app/logs
+    environment:
+      - RADARR_URL=http://mock-radarr:1080
+      - RADARR_API_KEY=test_api_key
+      - CLAUDE_API_KEY=test_api_key
+      - DEBUG_LOGGING=true
+    healthcheck:
+      test: ["CMD", "python", "-m", "kometa_ai", "--health-check"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    command: ["--health-check"]
+  
+  mock-radarr:
+    image: mockserver/mockserver
+    container_name: mock-radarr-test
+    ports:
+      - "7878:1080"
+    volumes:
+      - ./test_data/mock_radarr:/mockserver/mockserver_expectations

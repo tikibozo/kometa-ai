@@ -1,0 +1,72 @@
+collections:
+  # === KOMETA-AI ===
+  # enabled: true
+  # prompt: |
+  #   Identify films that would be excellent for introducing someone to world cinema based on these criteria:
+  #   - Non-English language films from diverse countries and cultures
+  #   - Internationally acclaimed with significant critical recognition or festival awards
+  #   - Accessible to viewers unfamiliar with world cinema (avoid extremely challenging or experimental films)
+  #   - Culturally significant works that showcase unique perspectives or filmmaking traditions
+  #   - Features universal themes that resonate across cultural boundaries
+  #   - Includes films that influenced global cinema or represent important film movements
+  #   - Balance between contemporary works and historical classics
+  #   - Prioritize films that offer unique cultural insights while remaining engaging
+  #   - Consider diversity in genre, country of origin, and time period
+  # confidence_threshold: 0.85
+  # priority: 2
+  # === END KOMETA-AI ===
+  World Cinema Essentials:
+    plex_search:
+      all:
+        country.not: United States
+
+  # === KOMETA-AI ===
+  # enabled: true
+  # prompt: |
+  #   Identify films that feature unique or innovative narrative structures based on these criteria:
+  #   - Deliberately uses non-traditional storytelling approaches:
+  #     - Non-linear narratives that significantly affect meaning or experience
+  #     - Multiple interconnected storylines that form a coherent whole
+  #     - Unreliable narration that challenges audience perception
+  #     - Meta-narrative elements that break the fourth wall
+  #     - Stories told backwards or with unusual temporal frameworks
+  #     - Nested or frame narratives with multiple layers
+  #     - Ambiguous reality or dream sequences integral to structure
+  #   - The unusual structure serves thematic purposes (not just stylistic showing off)
+  #   - Structure creates unique viewing experiences that wouldn't be possible with conventional storytelling
+  #   - Films that pushed boundaries or influenced later works in narrative innovation
+  #   - Structure requires active audience participation or interpretation
+  # confidence_threshold: 0.8
+  # exclude_tags: KAI-straightforward-narratives
+  # === END KOMETA-AI ===
+  Innovative Narratives:
+    plex_search:
+      any:
+        genre:
+          - Drama
+          - Mystery
+          - Thriller
+
+  # === KOMETA-AI ===
+  # enabled: true
+  # prompt: |
+  #   Identify visually spectacular films known for their cinematography based on these criteria:
+  #   - Exceptional visual qualities through masterful:
+  #     - Cinematography and camera work
+  #     - Use of color, lighting, and composition
+  #     - Visual storytelling that transcends dialogue
+  #     - Innovative or influential visual techniques
+  #     - Memorable and distinct imagery
+  #   - Visual elements serve storytelling purposes and thematic development
+  #   - Recognized for visual excellence (cinematography awards, critical praise for visuals)
+  #   - Creates immersive worlds or visual experiences that stand out from conventional filmmaking
+  #   - May include films by visually distinctive directors (Kubrick, Cuarón, Malick, etc.)
+  #   - Spans different visual styles (not just one aesthetic)
+  #   - Can include both digital and film-based cinematography across different eras
+  # confidence_threshold: 0.75
+  # include_tags: KAI-award-winning
+  # === END KOMETA-AI ===
+  Visual Masterpieces:
+    plex_search:
+      all:
+        title: ""
