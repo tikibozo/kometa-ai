@@ -5,6 +5,7 @@ import traceback
 import argparse
 import logging
 import time
+import json
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
@@ -12,7 +13,7 @@ from kometa_ai.__version__ import __version__
 from kometa_ai.config import Config
 from kometa_ai.utils.logging import setup_logging
 from kometa_ai.utils.scheduling import calculate_next_run_time, sleep_until
-from kometa_ai.utils.profiling import profiler, profile_time, profile_memory
+from kometa_ai.utils.profiling import profiler, profile_time
 from kometa_ai.radarr.client import RadarrClient
 from kometa_ai.claude.client import ClaudeClient
 from kometa_ai.claude.processor import MovieProcessor
@@ -586,7 +587,7 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
         try:
             email_notifier = EmailNotifier()
             if email_notifier.can_send():
-                subject = f"Kometa-AI Critical Error"
+                subject = "Kometa-AI Critical Error"
                 message = NotificationFormatter.format_error_notification(
                     error_context="main_pipeline",
                     error_message=str(e),
@@ -733,7 +734,7 @@ def send_test_email() -> bool:
             logger.error("Email configuration is incomplete, cannot send test")
             return False
             
-        subject = f"Kometa-AI Test Email"
+        subject = "Kometa-AI Test Email"
         message = f"""# Kometa-AI Test Email
 
 This is a test email from Kometa-AI v{__version__} to verify your email configuration.

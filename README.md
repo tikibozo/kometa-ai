@@ -38,6 +38,7 @@ Extend Kometa's existing collection definition files with special comment blocks
 collections:
   # === KOMETA-AI ===
   # enabled: true
+  # confidence_threshold: 0.7
   # prompt: |
   #   Identify film noir movies based on these criteria:
   #   - Made primarily between 1940-1959
@@ -45,7 +46,6 @@ collections:
   #   - Visual style emphasizing shadows, unusual angles
   #   - Crime or detective storylines
   #   - Femme fatale character often present
-  # confidence_threshold: 0.7
   # === END KOMETA-AI ===
   Film Noir:
     plex_search:
