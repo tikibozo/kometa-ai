@@ -148,8 +148,7 @@ def create_test_data():
     # Create Python module
     module_file = test_dir / "synthetic_movies.py"
     with open(module_file, "w") as f:
-        f.write("""
-"""
+        f.write('''"""
 Synthetic test data for movies and collections.
 This module provides sample data for testing without requiring external APIs.
 """
@@ -161,7 +160,7 @@ synthetic_movies = {movies}
 
 # Sample collection definitions
 synthetic_collections = {collections}
-""".format(
+'''.format(
             movies=json.dumps(synthetic_movies, indent=4),
             collections=json.dumps(synthetic_collections, indent=4)
         ))
