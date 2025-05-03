@@ -107,9 +107,12 @@ class EmailNotifier:
             msg.attach(text_part)
 
             # Connect to SMTP server
+            # Type note: We use Union[SMTP, SMTP_SSL] for server variable
+            # but mypy doesn't track this through the conditional
             if self.use_ssl:
                 context = ssl.create_default_context()
-                server = smtplib.SMTP_SSL(self.smtp_server, self.smtp_port, context=context)
+                server: Union[smtplib.SMTP, smtplib.SMTP_SSL] = smtplib.SMTP_SSL(
+                    self.smtp_server, self.smtp_port, context=context)
             else:
                 server = smtplib.SMTP(self.smtp_server, self.smtp_port)
 

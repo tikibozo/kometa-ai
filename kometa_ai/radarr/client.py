@@ -1,5 +1,5 @@
 import logging
-import requests
+import requests  # type: ignore
 import time
 from typing import List, Dict, Any, Optional, Union, Tuple
 

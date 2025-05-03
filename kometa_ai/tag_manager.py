@@ -22,7 +22,7 @@ class TagManager:
             radarr_client: RadarrClient instance for API operations
         """
         self.radarr = radarr_client
-        self._tags_cache = {}  # Cache of tag_label -> Tag objects
+        self._tags_cache: Dict[str, Tag] = {}  # Cache of tag_label -> Tag objects
         self._refresh_tags_cache()
 
     def _refresh_tags_cache(self) -> None:

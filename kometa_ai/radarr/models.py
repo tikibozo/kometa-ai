@@ -1,13 +1,12 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 
+from kometa_ai.common.models import Tag as BaseTag, MediaItem as BaseMediaItem
+
 
 @dataclass
-class Tag:
+class Tag(BaseTag):
     """Radarr tag model."""
-
-    id: int
-    label: str
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Tag':
@@ -26,17 +25,13 @@ class Tag:
 
 
 @dataclass
-class Movie:
+class Movie(BaseMediaItem):
     """Radarr movie model.
 
     This represents a movie in Radarr. Note that for Stage 1, we're only
     implementing a read-only subset of the fields that are relevant for
     movie categorization and tag management.
     """
-
-    # Required fields
-    id: int
-    title: str
 
     # Optional metadata fields
     original_title: Optional[str] = None

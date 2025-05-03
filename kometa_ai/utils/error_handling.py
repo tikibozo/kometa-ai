@@ -285,7 +285,7 @@ def recover_from_memory_error(error_ctx: ErrorContext) -> None:
 
     # Log available memory
     try:
-        import psutil
+        import psutil  # type: ignore
         process = psutil.Process()
         memory_info = process.memory_info()
         logger.info(f"Current memory usage: {memory_info.rss / (1024 * 1024):.2f} MB")

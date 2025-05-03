@@ -5,7 +5,7 @@ import json
 import logging
 from datetime import datetime, UTC
 from logging.handlers import RotatingFileHandler
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, MutableMapping
 
 
 class JsonFormatter(logging.Formatter):
@@ -103,7 +103,7 @@ class LoggerAdapter(logging.LoggerAdapter):
             extra = {}
         super().__init__(logger, extra)
 
-    def process(self, msg: str, kwargs: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
+    def process(self, msg: str, kwargs: MutableMapping[str, Any]) -> tuple[str, MutableMapping[str, Any]]:
         """Process the log record to add extra fields.
 
         Args:

@@ -18,7 +18,7 @@ from kometa_ai.radarr.client import RadarrClient
 from kometa_ai.claude.client import ClaudeClient
 from kometa_ai.claude.processor import MovieProcessor
 from kometa_ai.kometa.parser import KometaParser
-from kometa_ai.state.manager import StateManager
+from kometa_ai.state.manager import StateManager  # type: ignore
 from kometa_ai.tag_manager import TagManager
 from kometa_ai.notification.email import EmailNotifier
 from kometa_ai.notification.formatter import NotificationFormatter

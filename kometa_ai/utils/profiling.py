@@ -127,9 +127,11 @@ class PerformanceProfiler:
                 for stat in top_stats[:10]:  # Top 10 allocations
                     try:
                         # For newer versions of tracemalloc
+                        # Get the first frame if it's a traceback collection
+                        frame = stat.traceback[0] if hasattr(stat.traceback, '__getitem__') else stat.traceback
                         allocation = {
-                            'file': str(stat.traceback.filename),
-                            'line': stat.traceback.lineno,
+                            'file': str(frame.filename) if hasattr(frame, 'filename') else str(stat),
+                            'line': frame.lineno if hasattr(frame, 'lineno') else 0,
                             'size': stat.size,
                             'size_diff': stat.size_diff
                         }
