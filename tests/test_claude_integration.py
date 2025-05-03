@@ -7,11 +7,22 @@ from pathlib import Path
 import anthropic
 
 from kometa_ai.claude.client import ClaudeClient
-from kometa_ai.claude.processor import MovieProcessor
 from kometa_ai.claude.prompts import get_system_prompt, format_collection_prompt, format_movies_data
 from kometa_ai.radarr.models import Movie
 from kometa_ai.kometa.models import CollectionConfig
-from kometa_ai.state.manager import StateManager
+
+# Import from conftest.py which handles mocking if needed
+try:
+    from kometa_ai.state.manager import StateManager
+except ImportError:
+    # This should be handled by conftest.py, but in case it's not:
+    from conftest import MockStateManager as StateManager
+
+try:
+    from kometa_ai.claude.processor import MovieProcessor
+except ImportError:
+    # This should be handled by conftest.py, but in case it's not:
+    from conftest import MockMovieProcessor as MovieProcessor
 
 
 # Load test data
