@@ -71,17 +71,31 @@ jobs:
         echo "Looking for test result files:"
         find . -name "*.json" -o -name "*.log" -o -name "*.xml" | sort
         
+    - name: Create artifact directory
+      run: |
+        mkdir -p ./artifacts
+        # Copy any existing result files to the artifacts directory
+        find . -maxdepth 1 -name "*.json" -o -name "*.log" -o -name "*.xml" -exec cp {} ./artifacts/ \;
+        # Copy coverage.xml if it exists
+        if [ -f "coverage.xml" ]; then
+          cp coverage.xml ./artifacts/
+        fi
+        # Copy htmlcov directory if it exists
+        if [ -d "htmlcov" ]; then
+          cp -r htmlcov ./artifacts/
+        fi
+        # Always create a summary file
+        echo "Test run completed at $(date)" > ./artifacts/test_summary.txt
+        echo "Python version: ${{ matrix.python-version }}" >> ./artifacts/test_summary.txt
+        ls -la ./artifacts
+        
     - name: Upload test results
       uses: actions/upload-artifact@v3
       if: always()
       with:
         name: test-results-py${{ matrix.python-version }}
-        path: |
-          ./*.json
-          ./*.log
-          ./*.xml
-          ./coverage.xml
-          ./htmlcov/
+        path: ./artifacts
+        if-no-files-found: warn
 
   # Linting and type checking in a separate job
   lint-and-type-check:
@@ -144,14 +158,19 @@ jobs:
     - name: Check for coverage file
       id: check_coverage
       run: |
+        echo "Looking for coverage file in:"
+        ls -la
+        
         if [ -f "./coverage.xml" ]; then
           echo "COVERAGE_EXISTS=true" >> $GITHUB_OUTPUT
-          echo "Coverage file found"
-          ls -la ./coverage.xml
+          echo "Coverage file found in root directory"
+        elif [ -f "./artifacts/coverage.xml" ]; then
+          echo "COVERAGE_EXISTS=true" >> $GITHUB_OUTPUT
+          echo "Coverage file found in artifacts directory"
+          cp ./artifacts/coverage.xml ./coverage.xml
         else
           echo "COVERAGE_EXISTS=false" >> $GITHUB_OUTPUT
           echo "Coverage file not found"
-          ls -la
         fi
         
     - name: Upload coverage to Codecov
