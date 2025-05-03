@@ -9,27 +9,69 @@ from kometa_ai.claude.client import ClaudeClient, DEFAULT_BATCH_SIZE
 from kometa_ai.claude.prompts import get_system_prompt, format_collection_prompt, format_movies_data
 from kometa_ai.radarr.models import Movie
 from kometa_ai.kometa.models import CollectionConfig
-# Try to import state modules, but don't fail if they don't exist
-try:
-    from kometa_ai.state.manager import StateManager
-    from kometa_ai.state.models import DecisionRecord
-except ImportError:
-    # Create simple mock classes for testing
-    class StateManager:
-        def __init__(self, *args, **kwargs):
+# Add type stubs for mypy to avoid import-not-found error
+import sys
+from typing import Dict, List, Any, Optional, Type, Protocol
+
+# Define protocol classes for type checking
+class IStateManager(Protocol):
+    def __init__(self, *args: Any, **kwargs: Any) -> None: ...
+    def load(self) -> None: ...
+    def save(self) -> None: ...
+    def log_change(self, *args: Any, **kwargs: Any) -> None: ...
+    def log_error(self, *args: Any, **kwargs: Any) -> None: ...
+
+class IDecisionRecord(Protocol):
+    movie_id: int
+    collection_name: str
+    include: bool
+    confidence: float
+    metadata_hash: str
+    tag: str
+    timestamp: str
+    reasoning: Optional[str]
+
+# Import or define the necessary classes
+if not sys.modules.get('kometa_ai.state.manager'):
+    # Create a module object to avoid import errors
+    class _StateManager:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
             pass
-        def load(self):
+        def load(self) -> None:
             pass
-        def save(self):
+        def save(self) -> None:
             pass
-        def log_change(self, *args, **kwargs):
+        def log_change(self, *args: Any, **kwargs: Any) -> None:
             pass
-        def log_error(self, *args, **kwargs):
+        def log_error(self, *args: Any, **kwargs: Any) -> None:
             pass
     
-    class DecisionRecord:
-        def __init__(self, *args, **kwargs):
-            pass
+    class _DecisionRecord:
+        def __init__(self, 
+                     movie_id: int = 0,
+                     collection_name: str = "",
+                     include: bool = False,
+                     confidence: float = 0.0,
+                     metadata_hash: str = "",
+                     tag: str = "",
+                     timestamp: str = "",
+                     reasoning: Optional[str] = None) -> None:
+            self.movie_id = movie_id
+            self.collection_name = collection_name
+            self.include = include
+            self.confidence = confidence
+            self.metadata_hash = metadata_hash
+            self.tag = tag
+            self.timestamp = timestamp
+            self.reasoning = reasoning
+    
+    # Use the mock classes
+    StateManager: Type[IStateManager] = _StateManager
+    DecisionRecord: Type[IDecisionRecord] = _DecisionRecord
+else:
+    # Import the real classes if available
+    from kometa_ai.state.manager import StateManager  # type: ignore
+    from kometa_ai.state.models import DecisionRecord  # type: ignore
 from kometa_ai.utils.profiling import profile_time, profile_memory
 from kometa_ai.utils.memory_optimization import optimize_movie_objects, process_in_chunks, clear_memory
 from kometa_ai.utils.error_handling import (

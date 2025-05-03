@@ -2,5 +2,13 @@ include README.md
 include LICENSE
 include requirements.txt
 include requirements-dev.txt
-recursive-include kometa_ai *
-recursive-include kometa_ai/state *
+recursive-include kometa_ai *.py
+recursive-include kometa_ai py.typed
+recursive-include kometa_ai/state *.py
+recursive-include kometa_ai/state py.typed 
+recursive-include kometa_ai/claude *.py
+recursive-include kometa_ai/common *.py
+recursive-include kometa_ai/kometa *.py
+recursive-include kometa_ai/notification *.py
+recursive-include kometa_ai/radarr *.py
+recursive-include kometa_ai/utils *.py

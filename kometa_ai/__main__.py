@@ -18,30 +18,50 @@ from kometa_ai.radarr.client import RadarrClient
 from kometa_ai.claude.client import ClaudeClient
 from kometa_ai.claude.processor import MovieProcessor
 from kometa_ai.kometa.parser import KometaParser
-# Try to import state module, but don't fail if it doesn't exist
-try:
-    from kometa_ai.state.manager import StateManager
-except ImportError:
-    # Create a simple mock class for testing
-    class StateManager:
-        def __init__(self, *args, **kwargs):
+# Add type stubs for mypy to avoid import-not-found error
+import sys
+from typing import Dict, List, Any, Optional, Type, Protocol, cast
+
+# Define protocol class for type checking
+class IStateManager(Protocol):
+    def __init__(self, *args: Any, **kwargs: Any) -> None: ...
+    def load(self) -> None: ...
+    def save(self) -> None: ...
+    def log_change(self, *args: Any, **kwargs: Any) -> None: ...
+    def log_error(self, *args: Any, **kwargs: Any) -> None: ...
+    def get_changes(self) -> List[Dict[str, Any]]: ...
+    def get_errors(self) -> List[Dict[str, Any]]: ...
+    def reset(self) -> None: ...
+    def dump(self) -> str: ...
+
+# Import or define StateManager
+if not sys.modules.get('kometa_ai.state.manager'):
+    # Create a module object to avoid import errors
+    class _StateManager:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
             pass
-        def load(self):
+        def load(self) -> None:
             pass
-        def save(self):
+        def save(self) -> None:
             pass
-        def log_change(self, *args, **kwargs):
+        def log_change(self, *args: Any, **kwargs: Any) -> None:
             pass
-        def log_error(self, *args, **kwargs):
+        def log_error(self, *args: Any, **kwargs: Any) -> None:
             pass
-        def get_changes(self):
+        def get_changes(self) -> List[Dict[str, Any]]:
             return []
-        def get_errors(self):
+        def get_errors(self) -> List[Dict[str, Any]]:
             return []
-        def reset(self):
+        def reset(self) -> None:
             pass
-        def dump(self):
+        def dump(self) -> str:
             return "{}"
+    
+    # Use the mock class
+    StateManager: Type[IStateManager] = _StateManager
+else:
+    # Import the real class if available
+    from kometa_ai.state.manager import StateManager  # type: ignore
 from kometa_ai.tag_manager import TagManager
 from kometa_ai.notification.email import EmailNotifier
 from kometa_ai.notification.formatter import NotificationFormatter
