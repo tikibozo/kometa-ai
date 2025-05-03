@@ -307,16 +307,16 @@ def fix_site_packages(diag_results: Dict[str, Any]) -> bool:
     source_files = find_source_files(src_dir)
     
     # Hardcoded implementations of the state module files (used as fallback)
-    state_init_code = """# State management for Kometa-AI.
+    state_init_code = '''# State management for Kometa-AI.
 # This package provides functionality for persisting decisions and state.
 
 from kometa_ai.state.manager import StateManager
 from kometa_ai.state.models import DecisionRecord
 
 __all__ = ['StateManager', 'DecisionRecord']
-"""
+'''
     
-    state_models_code = """from dataclasses import dataclass, field
+    state_models_code = '''from dataclasses import dataclass, field
 from typing import Dict, List, Any, Optional
 from datetime import datetime, UTC
 
@@ -375,7 +375,7 @@ class DecisionRecord:
             result['reasoning'] = self.reasoning
 
         return result
-"""
+'''
     
     # Manager code is extensive, let's use what's in the source files if available
     # or copy from pre_build_setup.sh if it exists
@@ -400,7 +400,7 @@ class DecisionRecord:
     # If still no manager code, provide minimal implementation
     if not state_manager_code:
         logger.warning("Using minimal manager implementation as fallback")
-        state_manager_code = """
+        state_manager_code = '''
 import os
 import json
 import logging
@@ -462,7 +462,7 @@ class StateManager:
     def dump(self) -> str:
         """Dump state as formatted JSON string."""
         return "{}"
-"""
+'''
     
     # Track how many site-packages directories were fixed
     fixed_count = 0
