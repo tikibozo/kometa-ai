@@ -158,22 +158,47 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
     
-    - name: Extract metadata for Docker
-      id: meta
-      uses: docker/metadata-action@v4
-      with:
-        images: tikibozo/kometa-ai
-        tags: |
-          type=semver,pattern={{version}}
-          type=semver,pattern={{major}}.{{minor}}
-          type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+    # Set tags depending on the event type
+    - name: Set Docker tags
+      id: docker_tags
+      run: |
+        # Initialize tags array
+        TAGS=()
+        
+        # For version tags (v1.2.3)
+        if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/v}
+          MAJOR_MINOR=$(echo $VERSION | cut -d. -f1,2)
+          
+          # Add version tags
+          TAGS+=("tikibozo/kometa-ai:$VERSION")
+          TAGS+=("tikibozo/kometa-ai:$MAJOR_MINOR")
+          TAGS+=("tikibozo/kometa-ai:latest")
+          
+          echo "Building version $VERSION with tags: ${TAGS[*]}"
+        # For main branch
+        elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          # Add main tag
+          TAGS+=("tikibozo/kometa-ai:main")
+          
+          echo "Building main branch with tag: ${TAGS[*]}"
+        # Fallback (should not happen due to job condition)
+        else
+          # Use short SHA as tag
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          TAGS+=("tikibozo/kometa-ai:$SHORT_SHA")
+          
+          echo "Building with fallback tag: ${TAGS[*]}"
+        fi
+        
+        # Set output for use in the build step (comma-separated list of tags)
+        echo "tags=$(IFS=,; echo "${TAGS[*]}")" >> $GITHUB_OUTPUT
     
     - name: Build and push Docker image
       uses: docker/build-push-action@v4
       with:
         context: .
         push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
+        tags: ${{ steps.docker_tags.outputs.tags }}
         cache-from: type=registry,ref=tikibozo/kometa-ai:buildcache
         cache-to: type=registry,ref=tikibozo/kometa-ai:buildcache,mode=max
