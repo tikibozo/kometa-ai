@@ -28,6 +28,11 @@ echo "PYTHONPATH set to: $PYTHONPATH"
 # Create a symlink in tests directory to ensure kometa_ai can be imported
 echo "Setting up test environment..."
 
+# Run pre-build setup script
+echo "Running pre-build setup..."
+chmod +x ./scripts/pre_build_setup.sh
+./scripts/pre_build_setup.sh
+
 # Install package in development mode
 echo "Installing package in development mode..."
 python -m pip install -e . --verbose

@@ -14,7 +14,7 @@ with open("README.md", "r") as fh:
 with open("requirements.txt", "r") as f:
     requirements = f.read().splitlines()
 
-# Ensure py.typed files exist in all packages
+# Create directory structure and py.typed files if needed
 for pkg in ['kometa_ai', 
             'kometa_ai/claude', 
             'kometa_ai/common', 
@@ -23,10 +23,19 @@ for pkg in ['kometa_ai',
             'kometa_ai/radarr', 
             'kometa_ai/state',
             'kometa_ai/utils']:
+    # Make sure directory exists
+    if not os.path.exists(pkg):
+        os.makedirs(pkg, exist_ok=True)
+        # Create __init__.py if it doesn't exist
+        init_path = os.path.join(pkg, '__init__.py')
+        if not os.path.exists(init_path):
+            with open(init_path, 'w') as f:
+                f.write('"""Auto-generated package init."""\n')
+    
+    # Create py.typed file (empty file is sufficient)
     py_typed_path = os.path.join(pkg, 'py.typed')
-    if not os.path.exists(py_typed_path):
-        with open(py_typed_path, 'w') as f:
-            pass  # Create an empty file
+    with open(py_typed_path, 'w') as f:
+        pass
 
 setup(
     name="kometa-ai",

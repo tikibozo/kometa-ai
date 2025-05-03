@@ -99,12 +99,23 @@ def ensure_py_typed_files(base_dir: str) -> None:
     
     for pkg in packages:
         pkg_path = os.path.join(base_dir, pkg)
-        if os.path.exists(pkg_path):
-            py_typed_path = os.path.join(pkg_path, "py.typed")
-            if not os.path.exists(py_typed_path):
-                with open(py_typed_path, "w") as f:
-                    pass  # Create empty file
-                logger.info(f"Created py.typed file at {py_typed_path}")
+        # Create directory if it doesn't exist
+        if not os.path.exists(pkg_path):
+            os.makedirs(pkg_path, exist_ok=True)
+            logger.info(f"Created directory {pkg_path}")
+            
+            # Create __init__.py if needed
+            init_file = os.path.join(pkg_path, "__init__.py")
+            if not os.path.exists(init_file):
+                with open(init_file, "w") as f:
+                    f.write('"""Auto-generated package init."""\n')
+                logger.info(f"Created __init__.py at {init_file}")
+        
+        # Create py.typed file
+        py_typed_path = os.path.join(pkg_path, "py.typed")
+        with open(py_typed_path, "w") as f:
+            pass  # Create empty file
+        logger.info(f"Created/ensured py.typed file at {py_typed_path}")
 
 
 def fix_site_packages(diag_results: Dict[str, Any]) -> bool:
