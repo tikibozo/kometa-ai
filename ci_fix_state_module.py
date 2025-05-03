@@ -13,7 +13,8 @@ import importlib
 import importlib.util
 import logging
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Tuple
+import glob
 
 # Configure logging
 logging.basicConfig(
@@ -118,17 +119,79 @@ def ensure_py_typed_files(base_dir: str) -> None:
         logger.info(f"Created/ensured py.typed file at {py_typed_path}")
 
 
+def find_source_files(base_dir: str) -> Dict[str, Dict[str, str]]:
+    """Find source state module files in the current directory.
+    
+    Returns:
+        Dictionary with module names as keys and content as values.
+    """
+    source_files = {}
+    
+    # Define the files we're looking for
+    state_files = {
+        "__init__": os.path.join(base_dir, "kometa_ai", "state", "__init__.py"),
+        "manager": os.path.join(base_dir, "kometa_ai", "state", "manager.py"),
+        "models": os.path.join(base_dir, "kometa_ai", "state", "models.py"),
+    }
+    
+    # Check if files exist and if they do, read them
+    for name, path in state_files.items():
+        if os.path.exists(path):
+            try:
+                with open(path, "r") as f:
+                    content = f.read()
+                source_files[name] = {
+                    "path": path,
+                    "content": content,
+                    "exists": True
+                }
+                logger.info(f"Found source file for {name}: {path}")
+            except Exception as e:
+                logger.warning(f"Error reading source file {path}: {e}")
+                source_files[name] = {
+                    "path": path,
+                    "content": "",
+                    "exists": True,
+                    "error": str(e)
+                }
+        else:
+            logger.warning(f"Source file not found: {path}")
+            source_files[name] = {
+                "path": path,
+                "content": "",
+                "exists": False
+            }
+    
+    return source_files
+
+
 def fix_site_packages(diag_results: Dict[str, Any]) -> bool:
-    """Fix the state module in site-packages locations."""
+    """Fix the state module in site-packages locations.
+    
+    This function does the following:
+    1. Finds source state module files in the current directory
+    2. For each site-packages directory:
+       a. Creates the kometa_ai and state directories if they don't exist
+       b. Copies the source files to the site-packages location
+       c. If source files don't exist, uses hardcoded implementations
+    
+    Args:
+        diag_results: Dictionary with diagnostic results including site-packages paths
+        
+    Returns:
+        True if at least one site-packages directory was successfully fixed
+    """
     if not diag_results["site_packages"]:
         logger.error("No site-packages directories found")
         return False
     
     # Get the current directory for source files
     src_dir = os.getcwd()
-    src_state_dir = os.path.join(src_dir, "kometa_ai", "state")
     
-    # Hardcoded implementations of the state module files
+    # Check for source files
+    source_files = find_source_files(src_dir)
+    
+    # Hardcoded implementations of the state module files (used as fallback if source files don't exist)
     state_manager_code = """# mypy: disable-error-code="attr-defined,index,operator,return-value,arg-type"
 import os
 import json
@@ -145,17 +208,17 @@ logger = logging.getLogger(__name__)
 
 
 class StateManager:
-    \"\"\"Manager for persistent state.\"\"\"
+    """Manager for persistent state."""
 
     # Current state format version
     STATE_VERSION = 1
 
     def __init__(self, state_dir: str):
-        \"\"\"Initialize the state manager.
+        """Initialize the state manager.
 
         Args:
             state_dir: Directory for state files
-        \"\"\"
+        """
         self.state_dir = Path(state_dir)
         self.state_file = self.state_dir / 'kometa_state.json'
         self.backup_dir = self.state_dir / 'backups'
@@ -173,7 +236,7 @@ class StateManager:
         self.backup_dir.mkdir(parents=True, exist_ok=True)
 
     def load(self) -> None:
-        \"\"\"Load state from disk.\"\"\"
+        """Load state from disk."""
         try:
             if not self.state_file.exists():
                 logger.info(f"State file not found at {self.state_file}, using empty state")
@@ -199,7 +262,7 @@ class StateManager:
             self._try_restore_backup()
 
     def save(self) -> None:
-        \"\"\"Save state to disk.\"\"\"
+        """Save state to disk."""
         try:
             logger.info(f"Saving state to {self.state_file}")
 
@@ -223,7 +286,7 @@ class StateManager:
             logger.error(f"Error saving state: {e}")
 
     def _create_backup(self) -> None:
-        \"\"\"Create a backup of the current state file.\"\"\"
+        """Create a backup of the current state file."""
         try:
             timestamp = datetime.now(UTC).strftime('%Y%m%d%H%M%S')
             backup_file = self.backup_dir / f'kometa_state_{timestamp}.json'
@@ -240,11 +303,11 @@ class StateManager:
             logger.error(f"Error creating state backup: {e}")
 
     def _try_restore_backup(self) -> bool:
-        \"\"\"Try to restore from the latest backup.
+        """Try to restore from the latest backup.
 
         Returns:
             True if restored successfully, False otherwise
-        \"\"\"
+        """
         try:
             backups = sorted(self.backup_dir.glob('kometa_state_*.json'))
             if not backups:
@@ -264,7 +327,7 @@ class StateManager:
             return False
 
     def reset(self) -> None:
-        \"\"\"Reset state to empty.\"\"\"
+        """Reset state to empty."""
         self.state = {
             'version': __version__,
             'state_format_version': self.STATE_VERSION,
@@ -278,7 +341,7 @@ class StateManager:
         self.save()
 
     def get_decision(self, movie_id: int, collection_name: str) -> Optional[DecisionRecord]:
-        \"\"\"Get a decision for a movie/collection pair.
+        """Get a decision for a movie/collection pair.
 
         Args:
             movie_id: Movie ID
@@ -286,7 +349,7 @@ class StateManager:
 
         Returns:
             Decision record or None if not found
-        \"\"\"
+        """
         decisions = self.state.get('decisions', {})
         movie_key = f"movie:{movie_id}"
 
@@ -304,11 +367,11 @@ class StateManager:
         return DecisionRecord.from_dict(decision_data)
 
     def set_decision(self, decision: DecisionRecord) -> None:
-        \"\"\"Set a decision for a movie/collection pair.
+        """Set a decision for a movie/collection pair.
 
         Args:
             decision: Decision record
-        \"\"\"
+        """
         decisions = self.state.setdefault('decisions', {})
         movie_key = f"movie:{decision.movie_id}"
 
@@ -329,14 +392,14 @@ class StateManager:
         movie_decisions['metadata_hash'] = decision.metadata_hash
 
     def get_decisions_for_movie(self, movie_id: int) -> List[DecisionRecord]:
-        \"\"\"Get all decisions for a movie.
+        """Get all decisions for a movie.
 
         Args:
             movie_id: Movie ID
 
         Returns:
             List of decision records
-        \"\"\"
+        """
         decisions = self.state.get('decisions', {})
         movie_key = f"movie:{movie_id}"
 
@@ -355,14 +418,14 @@ class StateManager:
         return result
 
     def get_metadata_hash(self, movie_id: int) -> Optional[str]:
-        \"\"\"Get the stored metadata hash for a movie.
+        """Get the stored metadata hash for a movie.
 
         Args:
             movie_id: Movie ID
 
         Returns:
             Metadata hash or None if not found
-        \"\"\"
+        """
         decisions = self.state.get('decisions', {})
         movie_key = f"movie:{movie_id}"
 
@@ -377,7 +440,7 @@ class StateManager:
                    collection_name: str,
                    action: str,
                    tag: str) -> None:
-        \"\"\"Log a tag change.
+        """Log a tag change.
 
         Args:
             movie_id: Movie ID
@@ -385,7 +448,7 @@ class StateManager:
             collection_name: Collection name
             action: Action taken (added/removed)
             tag: Tag affected
-        \"\"\"
+        """
         changes = self.state.setdefault('changes', [])
 
         change = {
@@ -404,12 +467,12 @@ class StateManager:
             self.state['changes'] = changes[-100:]
 
     def log_error(self, context: str, error_message: str) -> None:
-        \"\"\"Log an error.
+        """Log an error.
 
         Args:
             context: Context where the error occurred (collection name, operation, etc.)
             error_message: Error message
-        \"\"\"
+        """
         errors = self.state.setdefault('errors', [])
 
         error = {
@@ -425,27 +488,27 @@ class StateManager:
             self.state['errors'] = errors[-50:]
 
     def get_changes(self) -> List[Dict[str, Any]]:
-        \"\"\"Get recent changes.
+        """Get recent changes.
 
         Returns:
             List of change records
-        \"\"\"
+        """
         return self.state.get('changes', [])
 
     def get_errors(self) -> List[Dict[str, Any]]:
-        \"\"\"Get recent errors.
+        """Get recent errors.
 
         Returns:
             List of error records
-        \"\"\"
+        """
         return self.state.get('errors', [])
 
     def dump(self) -> str:
-        \"\"\"Dump state as formatted JSON string.
+        """Dump state as formatted JSON string.
 
         Returns:
             Formatted JSON
-        \"\"\"
+        """
         return json.dumps(self.state, indent=2)
 """
 
@@ -456,7 +519,7 @@ from datetime import datetime, UTC
 
 @dataclass
 class DecisionRecord:
-    \"\"\"Record of a decision for a movie/collection pair.\"\"\"
+    """Record of a decision for a movie/collection pair."""
 
     movie_id: int
     collection_name: str
@@ -469,14 +532,14 @@ class DecisionRecord:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'DecisionRecord':
-        \"\"\"Create a DecisionRecord from a dictionary.
+        """Create a DecisionRecord from a dictionary.
 
         Args:
             data: Dictionary representation
 
         Returns:
             DecisionRecord object
-        \"\"\"
+        """
         return cls(
             movie_id=data.get('movie_id', 0),
             collection_name=data.get('collection_name', ''),
@@ -489,11 +552,11 @@ class DecisionRecord:
         )
 
     def to_dict(self) -> Dict[str, Any]:
-        \"\"\"Convert to a dictionary.
+        """Convert to a dictionary.
 
         Returns:
             Dictionary representation
-        \"\"\"
+        """
         result = {
             'movie_id': self.movie_id,
             'collection_name': self.collection_name,
@@ -510,11 +573,11 @@ class DecisionRecord:
         return result
 """
 
-    state_init_code = """\"\"\"
+    state_init_code = """"""
 State management for Kometa-AI.
 
 This package provides functionality for persisting decisions and state.
-\"\"\"
+"""
 
 from kometa_ai.state.manager import StateManager
 from kometa_ai.state.models import DecisionRecord
@@ -522,58 +585,95 @@ from kometa_ai.state.models import DecisionRecord
 __all__ = ['StateManager', 'DecisionRecord']
 """
     
-    success = False
+    # Track how many site-packages directories were fixed
+    fixed_count = 0
     
+    # For each site-packages directory
     for site_pkg in diag_results["site_packages"]:
-        logger.info(f"Fixing state module in {site_pkg}")
-        
-        # Create kometa_ai directory if it doesn't exist
-        kometa_dir = os.path.join(site_pkg, "kometa_ai")
-        os.makedirs(kometa_dir, exist_ok=True)
-        
-        # Ensure kometa_ai/__init__.py exists
-        kometa_init = os.path.join(kometa_dir, "__init__.py")
-        if not os.path.exists(kometa_init):
-            with open(kometa_init, "w") as f:
-                f.write('"""kometa-ai package for Claude integration with Radarr."""\n')
-            logger.info(f"Created {kometa_init}")
-        
-        # Create py.typed file for the main package
-        kometa_py_typed = os.path.join(kometa_dir, "py.typed")
-        with open(kometa_py_typed, "w") as f:
-            pass  # Empty file
-        logger.info(f"Created {kometa_py_typed}")
-        
-        # Create state directory
-        state_dir = os.path.join(kometa_dir, "state")
-        os.makedirs(state_dir, exist_ok=True)
-        
-        # Write state module files using hardcoded implementations
-        with open(os.path.join(state_dir, "__init__.py"), "w") as f:
-            f.write(state_init_code)
-        logger.info(f"Created/updated {os.path.join(state_dir, '__init__.py')}")
-        
-        with open(os.path.join(state_dir, "models.py"), "w") as f:
-            f.write(state_models_code)
-        logger.info(f"Created/updated {os.path.join(state_dir, 'models.py')}")
-        
-        with open(os.path.join(state_dir, "manager.py"), "w") as f:
-            f.write(state_manager_code)
-        logger.info(f"Created/updated {os.path.join(state_dir, 'manager.py')}")
-        
-        # Create py.typed for state module
-        state_py_typed = os.path.join(state_dir, "py.typed")
-        with open(state_py_typed, "w") as f:
-            pass  # Empty file
-        logger.info(f"Created {state_py_typed}")
-        
-        success = True
+        try:
+            logger.info(f"Fixing state module in {site_pkg}")
+            
+            # Create kometa_ai directory if it doesn't exist
+            kometa_dir = os.path.join(site_pkg, "kometa_ai")
+            os.makedirs(kometa_dir, exist_ok=True)
+            
+            # Ensure kometa_ai/__init__.py exists
+            kometa_init = os.path.join(kometa_dir, "__init__.py")
+            if not os.path.exists(kometa_init):
+                with open(kometa_init, "w") as f:
+                    f.write('"""kometa-ai package for Claude integration with Radarr."""\n')
+                logger.info(f"Created {kometa_init}")
+            
+            # Create py.typed file for the main package
+            kometa_py_typed = os.path.join(kometa_dir, "py.typed")
+            with open(kometa_py_typed, "w") as f:
+                pass  # Empty file
+            logger.info(f"Created {kometa_py_typed}")
+            
+            # Create state directory
+            state_dir = os.path.join(kometa_dir, "state")
+            os.makedirs(state_dir, exist_ok=True)
+            
+            # Write state module files using either source files or hardcoded implementations
+            
+            # 1. __init__.py
+            init_content = source_files.get("__init__", {}).get("content", "") if source_files.get("__init__", {}).get("exists", False) else state_init_code
+            with open(os.path.join(state_dir, "__init__.py"), "w") as f:
+                f.write(init_content)
+            logger.info(f"Created/updated {os.path.join(state_dir, '__init__.py')}")
+            
+            # 2. models.py
+            models_content = source_files.get("models", {}).get("content", "") if source_files.get("models", {}).get("exists", False) else state_models_code
+            with open(os.path.join(state_dir, "models.py"), "w") as f:
+                f.write(models_content)
+            logger.info(f"Created/updated {os.path.join(state_dir, 'models.py')}")
+            
+            # 3. manager.py
+            manager_content = source_files.get("manager", {}).get("content", "") if source_files.get("manager", {}).get("exists", False) else state_manager_code
+            with open(os.path.join(state_dir, "manager.py"), "w") as f:
+                f.write(manager_content)
+            logger.info(f"Created/updated {os.path.join(state_dir, 'manager.py')}")
+            
+            # Create py.typed for state module
+            state_py_typed = os.path.join(state_dir, "py.typed")
+            with open(state_py_typed, "w") as f:
+                pass  # Empty file
+            logger.info(f"Created {state_py_typed}")
+            
+            # Ensure file permissions are correct
+            for py_file in [
+                os.path.join(state_dir, "__init__.py"),
+                os.path.join(state_dir, "models.py"),
+                os.path.join(state_dir, "manager.py"),
+                os.path.join(state_dir, "py.typed")
+            ]:
+                try:
+                    # Make sure file is readable by all
+                    os.chmod(py_file, 0o644)
+                except Exception as e:
+                    logger.warning(f"Could not set permissions on {py_file}: {e}")
+            
+            fixed_count += 1
+            logger.info(f"Successfully fixed state module in {site_pkg}")
+            
+        except Exception as e:
+            logger.error(f"Error fixing state module in {site_pkg}: {e}")
     
-    return success
+    return fixed_count > 0
 
 
 def verify_imports() -> bool:
-    """Verify that imports are working properly now."""
+    """Verify that imports are working properly now.
+    
+    This function does a thorough verification by:
+    1. Clearing importlib cache
+    2. Attempting to import StateManager and DecisionRecord from kometa_ai.state
+    3. Checking if the StateManager can be instantiated
+    4. Verifying module file paths are correct
+    
+    Returns:
+        True if imports are working properly, False otherwise
+    """
     # Clear importlib cache to ensure fresh imports
     importlib.invalidate_caches()
     logger.info("Cleared importlib cache")
@@ -586,18 +686,68 @@ def verify_imports() -> bool:
         logger.info(f"Successfully imported StateManager: {StateManager}")
         logger.info(f"Successfully imported DecisionRecord: {DecisionRecord}")
         
+        # Test if we can instantiate StateManager
+        try:
+            temp_dir = os.path.join(os.getcwd(), "temp_state_test")
+            os.makedirs(temp_dir, exist_ok=True)
+            
+            state_manager = StateManager(temp_dir)
+            logger.info(f"Successfully instantiated StateManager: {state_manager}")
+            
+            # Clean up temporary directory
+            try:
+                shutil.rmtree(temp_dir)
+            except Exception as e:
+                logger.warning(f"Could not clean up test directory {temp_dir}: {e}")
+                
+        except Exception as e:
+            logger.error(f"Failed to instantiate StateManager: {e}")
+            return False
+        
         # Check module file paths
         state_module = sys.modules.get("kometa_ai.state")
         if state_module and hasattr(state_module, "__file__"):
             logger.info(f"kometa_ai.state module file: {state_module.__file__}")
+        else:
+            logger.warning("Could not determine kometa_ai.state module file")
         
         manager_module = sys.modules.get("kometa_ai.state.manager")
         if manager_module and hasattr(manager_module, "__file__"):
             logger.info(f"kometa_ai.state.manager module file: {manager_module.__file__}")
+        else:
+            logger.warning("Could not determine kometa_ai.state.manager module file")
+        
+        models_module = sys.modules.get("kometa_ai.state.models")
+        if models_module and hasattr(models_module, "__file__"):
+            logger.info(f"kometa_ai.state.models module file: {models_module.__file__}")
+        else:
+            logger.warning("Could not determine kometa_ai.state.models module file")
         
         return True
     except ImportError as e:
         logger.error(f"Import verification failed: {e}")
+        
+        # Provide additional diagnostics
+        logger.error("Diagnostic information:")
+        
+        # Check if kometa_ai is importable
+        try:
+            import kometa_ai
+            logger.info(f"kometa_ai can be imported, version: {getattr(kometa_ai, '__version__', 'unknown')}")
+            logger.info(f"kometa_ai location: {getattr(kometa_ai, '__file__', 'unknown')}")
+            
+            # Check if state module exists
+            if hasattr(kometa_ai, 'state'):
+                logger.info("kometa_ai.state attribute exists")
+                logger.info(f"kometa_ai.state: {kometa_ai.state}")
+            else:
+                logger.error("kometa_ai.state attribute does not exist")
+                
+            # List what's in the module
+            logger.info(f"kometa_ai contents: {dir(kometa_ai)}")
+        except ImportError as e2:
+            logger.error(f"Even kometa_ai cannot be imported: {e2}")
+        
         return False
 
 
