@@ -208,17 +208,15 @@ logger = logging.getLogger(__name__)
 
 
 class StateManager:
-    """Manager for persistent state."""
+    # Manager for persistent state
+"""
 
     # Current state format version
     STATE_VERSION = 1
 
     def __init__(self, state_dir: str):
-        """Initialize the state manager.
-
-        Args:
-            state_dir: Directory for state files
-        """
+        # Initialize the state manager.
+        # Args: state_dir: Directory for state files
         self.state_dir = Path(state_dir)
         self.state_file = self.state_dir / 'kometa_state.json'
         self.backup_dir = self.state_dir / 'backups'
@@ -236,7 +234,7 @@ class StateManager:
         self.backup_dir.mkdir(parents=True, exist_ok=True)
 
     def load(self) -> None:
-        """Load state from disk."""
+        # Load state from disk.
         try:
             if not self.state_file.exists():
                 logger.info(f"State file not found at {self.state_file}, using empty state")
@@ -262,7 +260,7 @@ class StateManager:
             self._try_restore_backup()
 
     def save(self) -> None:
-        """Save state to disk."""
+        # Save state to disk.
         try:
             logger.info(f"Saving state to {self.state_file}")
 
@@ -286,7 +284,7 @@ class StateManager:
             logger.error(f"Error saving state: {e}")
 
     def _create_backup(self) -> None:
-        """Create a backup of the current state file."""
+        # Create a backup of the current state file.
         try:
             timestamp = datetime.now(UTC).strftime('%Y%m%d%H%M%S')
             backup_file = self.backup_dir / f'kometa_state_{timestamp}.json'
@@ -303,11 +301,8 @@ class StateManager:
             logger.error(f"Error creating state backup: {e}")
 
     def _try_restore_backup(self) -> bool:
-        """Try to restore from the latest backup.
-
-        Returns:
-            True if restored successfully, False otherwise
-        """
+        # Try to restore from the latest backup.
+        # Returns: True if restored successfully, False otherwise
         try:
             backups = sorted(self.backup_dir.glob('kometa_state_*.json'))
             if not backups:
@@ -327,7 +322,7 @@ class StateManager:
             return False
 
     def reset(self) -> None:
-        """Reset state to empty."""
+        # Reset state to empty.
         self.state = {
             'version': __version__,
             'state_format_version': self.STATE_VERSION,
@@ -341,15 +336,11 @@ class StateManager:
         self.save()
 
     def get_decision(self, movie_id: int, collection_name: str) -> Optional[DecisionRecord]:
-        """Get a decision for a movie/collection pair.
-
-        Args:
-            movie_id: Movie ID
-            collection_name: Collection name
-
-        Returns:
-            Decision record or None if not found
-        """
+        # Get a decision for a movie/collection pair.
+        # Args:
+        #   movie_id: Movie ID
+        #   collection_name: Collection name
+        # Returns: Decision record or None if not found
         decisions = self.state.get('decisions', {})
         movie_key = f"movie:{movie_id}"
 
@@ -367,11 +358,8 @@ class StateManager:
         return DecisionRecord.from_dict(decision_data)
 
     def set_decision(self, decision: DecisionRecord) -> None:
-        """Set a decision for a movie/collection pair.
-
-        Args:
-            decision: Decision record
-        """
+        # Set a decision for a movie/collection pair.
+        # Args: decision: Decision record
         decisions = self.state.setdefault('decisions', {})
         movie_key = f"movie:{decision.movie_id}"
 
@@ -392,14 +380,9 @@ class StateManager:
         movie_decisions['metadata_hash'] = decision.metadata_hash
 
     def get_decisions_for_movie(self, movie_id: int) -> List[DecisionRecord]:
-        """Get all decisions for a movie.
-
-        Args:
-            movie_id: Movie ID
-
-        Returns:
-            List of decision records
-        """
+        # Get all decisions for a movie.
+        # Args: movie_id: Movie ID
+        # Returns: List of decision records
         decisions = self.state.get('decisions', {})
         movie_key = f"movie:{movie_id}"
 
@@ -418,14 +401,9 @@ class StateManager:
         return result
 
     def get_metadata_hash(self, movie_id: int) -> Optional[str]:
-        """Get the stored metadata hash for a movie.
-
-        Args:
-            movie_id: Movie ID
-
-        Returns:
-            Metadata hash or None if not found
-        """
+        # Get the stored metadata hash for a movie.
+        # Args: movie_id: Movie ID
+        # Returns: Metadata hash or None if not found
         decisions = self.state.get('decisions', {})
         movie_key = f"movie:{movie_id}"
 
@@ -440,15 +418,13 @@ class StateManager:
                    collection_name: str,
                    action: str,
                    tag: str) -> None:
-        """Log a tag change.
-
-        Args:
-            movie_id: Movie ID
-            movie_title: Movie title
-            collection_name: Collection name
-            action: Action taken (added/removed)
-            tag: Tag affected
-        """
+        # Log a tag change.
+        # Args:
+        #   movie_id: Movie ID
+        #   movie_title: Movie title
+        #   collection_name: Collection name
+        #   action: Action taken (added/removed)
+        #   tag: Tag affected
         changes = self.state.setdefault('changes', [])
 
         change = {
@@ -467,12 +443,10 @@ class StateManager:
             self.state['changes'] = changes[-100:]
 
     def log_error(self, context: str, error_message: str) -> None:
-        """Log an error.
-
-        Args:
-            context: Context where the error occurred (collection name, operation, etc.)
-            error_message: Error message
-        """
+        # Log an error.
+        # Args:
+        #   context: Context where the error occurred (collection name, operation, etc.)
+        #   error_message: Error message
         errors = self.state.setdefault('errors', [])
 
         error = {
@@ -488,27 +462,18 @@ class StateManager:
             self.state['errors'] = errors[-50:]
 
     def get_changes(self) -> List[Dict[str, Any]]:
-        """Get recent changes.
-
-        Returns:
-            List of change records
-        """
+        # Get recent changes.
+        # Returns: List of change records
         return self.state.get('changes', [])
 
     def get_errors(self) -> List[Dict[str, Any]]:
-        """Get recent errors.
-
-        Returns:
-            List of error records
-        """
+        # Get recent errors.
+        # Returns: List of error records
         return self.state.get('errors', [])
 
     def dump(self) -> str:
-        """Dump state as formatted JSON string.
-
-        Returns:
-            Formatted JSON
-        """
+        # Dump state as formatted JSON string.
+        # Returns: Formatted JSON
         return json.dumps(self.state, indent=2)
 """
 
@@ -519,7 +484,7 @@ from datetime import datetime, UTC
 
 @dataclass
 class DecisionRecord:
-    """Record of a decision for a movie/collection pair."""
+    # Record of a decision for a movie/collection pair
 
     movie_id: int
     collection_name: str
@@ -532,14 +497,9 @@ class DecisionRecord:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'DecisionRecord':
-        """Create a DecisionRecord from a dictionary.
-
-        Args:
-            data: Dictionary representation
-
-        Returns:
-            DecisionRecord object
-        """
+        # Create a DecisionRecord from a dictionary.
+        # Args: data: Dictionary representation
+        # Returns: DecisionRecord object
         return cls(
             movie_id=data.get('movie_id', 0),
             collection_name=data.get('collection_name', ''),
@@ -552,11 +512,8 @@ class DecisionRecord:
         )
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to a dictionary.
-
-        Returns:
-            Dictionary representation
-        """
+        # Convert to a dictionary.
+        # Returns: Dictionary representation
         result = {
             'movie_id': self.movie_id,
             'collection_name': self.collection_name,
@@ -573,11 +530,8 @@ class DecisionRecord:
         return result
 """
 
-    state_init_code = """"""
-State management for Kometa-AI.
-
-This package provides functionality for persisting decisions and state.
-"""
+    state_init_code = """# State management for Kometa-AI.
+# This package provides functionality for persisting decisions and state.
 
 from kometa_ai.state.manager import StateManager
 from kometa_ai.state.models import DecisionRecord
