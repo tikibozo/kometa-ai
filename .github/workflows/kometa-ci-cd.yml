@@ -44,8 +44,9 @@ jobs:
         
     - name: Ensure state module is properly importable 
       run: |
-        # Execute the CI state module fix script
-        python ci_fix_state_module.py
+        # Make run_ci_fix.py script executable and run it
+        chmod +x run_ci_fix.py
+        python run_ci_fix.py
         
     - name: Create sample data for testing
       run: |
@@ -61,7 +62,8 @@ jobs:
         SKIP_PRODUCTION_TESTS: "true"
         CI: "true"
       run: |
-        python scripts/run_ci_tests.sh --install
+        # Run tests directly with pytest instead of using a shell script
+        python -m pytest -xvs
         
     - name: List files in workspace (debugging)
       run: |
