@@ -36,15 +36,87 @@ def load_test_data():
     movies_file = test_dir / "synthetic_movies.json"
     collections_file = test_dir / "synthetic_collections.json"
     
-    # Generate test data if it doesn't exist
-    if not movies_file.exists() or not collections_file.exists():
-        from test_data.synthetic_movies import synthetic_movies, synthetic_collections
-    else:
+    # Always load from JSON files if they exist
+    if movies_file.exists() and collections_file.exists():
         with open(movies_file, 'r') as f:
             synthetic_movies = json.load(f)
         
         with open(collections_file, 'r') as f:
             synthetic_collections = json.load(f)
+    else:
+        # Fallback to hardcoded test data
+        synthetic_movies = [
+            {
+                "id": 1001,
+                "title": "The Adventure Quest",
+                "year": 2020,
+                "overview": "A group of friends embark on an epic adventure to find a hidden treasure.",
+                "genres": ["Adventure", "Action", "Fantasy"],
+                "tagline": "The greatest adventure awaits",
+                "runtime": 124,
+                "rating": 7.8,
+                "director": "Jane Smith",
+                "actors": ["John Doe", "Sarah Johnson", "Mike Williams"],
+                "studio": "Adventure Studios"
+            },
+            {
+                "id": 1002,
+                "title": "Mystery in the Dark",
+                "year": 2018,
+                "overview": "A detective investigates a series of mysterious disappearances in a small town.",
+                "genres": ["Mystery", "Thriller", "Crime"],
+                "tagline": "The truth lies in the shadows",
+                "runtime": 112,
+                "rating": 8.2,
+                "director": "Robert Brown",
+                "actors": ["Emily Clark", "David Wilson", "Linda Martin"],
+                "studio": "Enigma Pictures"
+            },
+            {
+                "id": 1003,
+                "title": "Laugh Out Loud",
+                "year": 2021,
+                "overview": "A stand-up comedian tries to make it big while dealing with personal challenges.",
+                "genres": ["Comedy", "Drama"],
+                "tagline": "Sometimes life is the best punchline",
+                "runtime": 98,
+                "rating": 7.5,
+                "director": "Michael Johnson",
+                "actors": ["Lisa Adams", "Tom Clark", "Kevin White"],
+                "studio": "Funny Films"
+            }
+        ]
+        
+        synthetic_collections = [
+            {
+                "name": "Adventure Films",
+                "description": "Movies focused on exciting journeys, quests, and exploration.",
+                "criteria": "Movies with adventure themes, often featuring quests, journeys, or exploration into unknown territories.",
+                "tag": "adventure-films",
+                "enabled": True
+            },
+            {
+                "name": "Mystery Thrillers",
+                "description": "Suspenseful movies with mystery elements.",
+                "criteria": "Films that combine mystery and thriller elements, featuring investigations, suspense, and plot twists.",
+                "tag": "mystery-thrillers",
+                "enabled": True
+            },
+            {
+                "name": "Comedy Collection",
+                "description": "Funny movies to lighten the mood.",
+                "criteria": "Movies intended to make the audience laugh through humor, amusing situations, and comedy.",
+                "tag": "comedy-collection",
+                "enabled": True
+            }
+        ]
+        
+        # Save to JSON files for future use
+        with open(movies_file, 'w') as f:
+            json.dump(synthetic_movies, f, indent=2)
+            
+        with open(collections_file, 'w') as f:
+            json.dump(synthetic_collections, f, indent=2)
     
     # Convert to model objects
     movies = [Movie.from_dict(movie_data) for movie_data in synthetic_movies]

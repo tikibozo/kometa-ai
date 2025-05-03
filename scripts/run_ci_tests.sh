@@ -295,6 +295,8 @@ EOF
 # Execute the helper script to fix the state directory
 echo "Fixing state directory..."
 python fix_state_dir.py
+echo "Fixing completed, verifying state directory structure:"
+find /opt/hostedtoolcache/Python/*/x64/lib/python*/site-packages/kometa_ai/state -type f | sort
 
 # Copy mypy.ini to the current directory for CI
 if [ -f "mypy.ini" ]; then
