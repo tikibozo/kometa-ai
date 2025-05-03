@@ -103,7 +103,7 @@ class LoggerAdapter(logging.LoggerAdapter):
             extra = {}
         super().__init__(logger, extra)
 
-    def process(self, msg: str, kwargs: Dict[str, Any]) -> tuple:
+    def process(self, msg: str, kwargs: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
         """Process the log record to add extra fields.
 
         Args:
@@ -117,7 +117,9 @@ class LoggerAdapter(logging.LoggerAdapter):
         if "extra" not in kwargs:
             kwargs["extra"] = {}
 
-        for key, value in self.extra.items():
-            kwargs["extra"][key] = value
+        # Handle case when self.extra might be None
+        if self.extra:
+            for key, value in self.extra.items():
+                kwargs["extra"][key] = value
 
         return msg, kwargs

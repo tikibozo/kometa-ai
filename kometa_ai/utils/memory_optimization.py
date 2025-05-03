@@ -8,7 +8,7 @@ particularly for large movie libraries.
 import logging
 import gc
 import sys
-from typing import List, Any, Dict, Callable, TypeVar, cast
+from typing import List, Any, Dict, Callable, TypeVar, cast, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ def clear_memory():
     gc.collect(generation=2)
 
 
-def get_size(obj: Any, seen: set = None) -> int:
+def get_size(obj: Any, seen: Optional[set] = None) -> int:
     """Recursively calculate the size of an object in bytes.
 
     Args:
@@ -73,7 +73,8 @@ def optimize_movie_objects(movies: List[Any]) -> List[Any]:
     }
 
     # Fields needed for metadata hash calculation
-    hash_fields = {
+    # We're using this as a reference for our optimized data, but not directly accessing it
+    _hash_fields = {
         'title', 'year', 'overview', 'genres', 'tags'
     }
 
@@ -112,7 +113,9 @@ def optimize_movie_objects(movies: List[Any]) -> List[Any]:
 
                 # Ensure the metadata hash calculation still works
                 if hasattr(movie, 'calculate_metadata_hash'):
-                    optimized_movie.calculate_metadata_hash = movie.calculate_metadata_hash
+                    # Use dynamic attribute handling to avoid type checking issues
+                    setattr(optimized_movie, 'calculate_metadata_hash', 
+                            getattr(movie, 'calculate_metadata_hash'))
             except (AttributeError, TypeError):
                 # If we can't create a new instance, just use the original
                 optimized_movie = movie

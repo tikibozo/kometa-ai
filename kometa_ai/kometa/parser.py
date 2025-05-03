@@ -242,19 +242,25 @@ class KometaParser:
 
         # Convert types for specific keys
         if 'enabled' in config:
-            config['enabled'] = str(config['enabled']).lower() in ('true', 'yes', '1')
+            # Save to a temp variable to avoid type error
+            enabled_value = str(config['enabled']).lower() in ('true', 'yes', '1')
+            config['enabled'] = enabled_value  # type: ignore
 
         if 'confidence_threshold' in config:
             try:
-                config['confidence_threshold'] = float(config['confidence_threshold'])
+                # Save to a temp variable to avoid type error
+                threshold_value = float(config['confidence_threshold'])
+                config['confidence_threshold'] = threshold_value  # type: ignore
             except ValueError:
-                config['confidence_threshold'] = 0.7
+                config['confidence_threshold'] = 0.7  # type: ignore
 
         if 'priority' in config:
             try:
-                config['priority'] = int(config['priority'])
+                # Save to a temp variable to avoid type error
+                priority_value = int(config['priority'])
+                config['priority'] = priority_value  # type: ignore
             except ValueError:
-                config['priority'] = 0
+                config['priority'] = 0  # type: ignore
 
         return config
 

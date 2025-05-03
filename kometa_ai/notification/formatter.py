@@ -20,7 +20,7 @@ class NotificationFormatter:
         Returns:
             Dictionary with collections as keys and action groups as values
         """
-        by_collection = defaultdict(lambda: {"added": [], "removed": []})
+        by_collection: Dict[str, Dict[str, List[Dict[str, Any]]]] = defaultdict(lambda: {"added": [], "removed": []})
 
         for change in changes:
             collection = change.get("collection", "unknown")

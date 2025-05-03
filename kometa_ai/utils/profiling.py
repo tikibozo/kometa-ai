@@ -17,7 +17,7 @@ import json
 
 # Mock psutil if not available
 try:
-    import psutil
+    import psutil  # type: ignore
 except ImportError:
     # Create a mock psutil for testing
     class MockProcess:
@@ -64,11 +64,11 @@ class PerformanceProfiler:
             'api_calls': {},
             'batch_efficiency': {}
         }
-        self._start_time = None
-        self._start_memory = None
-        self._collection_start_times = {}
-        self._memory_snapshots = {}
-        self._last_snapshot = None
+        self._start_time: Optional[float] = None
+        self._start_memory: Optional[Dict[str, Any]] = None
+        self._collection_start_times: Dict[str, float] = {}
+        self._memory_snapshots: Dict[str, Any] = {}
+        self._last_snapshot: Optional[tracemalloc.Snapshot] = None
 
     def start(self) -> None:
         """Start performance profiling."""
@@ -105,7 +105,7 @@ class PerformanceProfiler:
         duration = end_time - cast(float, self._start_time)
 
         # Calculate memory diff properly
-        memory_diff = {}
+        memory_diff: Dict[str, Any] = {}
         if isinstance(self._start_memory, dict) and isinstance(end_memory, dict):
             for key in end_memory:
                 if key in self._start_memory:

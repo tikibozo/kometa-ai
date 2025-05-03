@@ -1,12 +1,12 @@
 import logging
 import time
 import json
-from typing import Dict, List, Any, Optional, Union, Tuple
+from typing import Dict, List, Any, Optional, Union, Tuple, cast
 from datetime import datetime, UTC
 
-import anthropic
-from anthropic import Anthropic
-from anthropic._types import NOT_GIVEN
+# Type ignore for anthropic imports as they don't have stubs
+import anthropic  # type: ignore
+from anthropic import Anthropic  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -70,11 +70,12 @@ class ClaudeClient:
             output_cost = (output_tokens / 1_000_000) * 15.0
             total_cost = input_cost + output_cost
 
-            # Update tracking
-            self._cost_tracking['total_input_tokens'] += input_tokens
-            self._cost_tracking['total_output_tokens'] += output_tokens
-            self._cost_tracking['total_cost'] += total_cost
-            self._cost_tracking['requests'] += 1
+            # Update tracking with type safety
+            # Use type checking to handle dynamic dictionary values safely
+            self._cost_tracking['total_input_tokens'] = cast(int, self._cost_tracking['total_input_tokens']) + input_tokens
+            self._cost_tracking['total_output_tokens'] = cast(int, self._cost_tracking['total_output_tokens']) + output_tokens
+            self._cost_tracking['total_cost'] = cast(float, self._cost_tracking['total_cost']) + total_cost
+            self._cost_tracking['requests'] = cast(int, self._cost_tracking['requests']) + 1
 
             # Log usage
             logger.info(
@@ -157,8 +158,12 @@ class ClaudeClient:
                     logger.debug(f"Claude response: {response.content}")
 
                 # Validate response has content
-                if not response.content or not response.content[0].text:
+                if not response.content:
                     raise ValueError("Claude API returned empty response")
+                
+                # Check for TextBlock with text attribute
+                if not hasattr(response.content[0], "text") or not response.content[0].text:
+                    raise ValueError("Claude API returned response without text content")
 
                 # Parse JSON from response
                 try:
@@ -177,7 +182,9 @@ class ClaudeClient:
                 except (ValueError, json.JSONDecodeError) as e:
                     # Log the response that failed parsing
                     logger.error(f"JSON parsing error: {e}")
-                    logger.error(f"Failed to parse response: {response.content[0].text[:500]}...")
+                    # Get text from response content safely
+                    response_text = getattr(response.content[0], "text", "No text content")
+                    logger.error(f"Failed to parse response: {response_text[:500]}...")
 
                     # Retry with the same strategy as rate limit errors
                     retries += 1

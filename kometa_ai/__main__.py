@@ -6,7 +6,7 @@ import argparse
 import logging
 import time
 import json
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, cast
 from datetime import datetime
 
 from kometa_ai.__version__ import __version__
@@ -48,7 +48,7 @@ def setup_signal_handlers():
         pass
 
 
-def parse_args(args: List[str] = None) -> argparse.Namespace:
+def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Kometa-AI: Claude integration for Radarr collections")
 
@@ -227,7 +227,7 @@ def process_collections(
     )
 
     # Track overall statistics
-    results = {
+    results: Dict[str, Any] = {
         "total_changes": 0,
         "collections_processed": 0,
         "movies_processed": 0,
@@ -304,17 +304,17 @@ def process_collections(
                     logger.info(
                         f"No changes needed for collection '{collection.name}'")
 
-                results["total_changes"] += len(changes)
-                results["changes"].extend(changes)
+                results["total_changes"] = cast(int, results["total_changes"]) + len(changes)
+                cast(list, results["changes"]).extend(changes)
             else:
                 logger.info(
                     f"Dry run mode: would apply {len(included_ids)} tag changes "
                     f"for '{collection.name}'")
 
             # Store statistics
-            results["collection_stats"][collection.name] = stats
-            results["collections_processed"] += 1
-            results["movies_processed"] += stats.get("processed_movies", 0)
+            cast(Dict[str, Any], results["collection_stats"])[collection.name] = stats
+            results["collections_processed"] = cast(int, results["collections_processed"]) + 1
+            results["movies_processed"] = cast(int, results["movies_processed"]) + stats.get("processed_movies", 0)
 
             # Mark collection end for profiling
             if enable_profiling:
@@ -333,7 +333,7 @@ def process_collections(
             )
 
             # Add to results for summary
-            results["errors"].append({
+            cast(list, results["errors"]).append({
                 "collection": collection.name,
                 "error": str(e),
                 "traceback": traceback.format_exc()
@@ -354,7 +354,7 @@ def process_collections(
     else:
         error_status = " with no errors"
 
-    if results['total_changes'] > 0:
+    if cast(int, results['total_changes']) > 0:
         logger.info(
             f"Completed: Processed {results['collections_processed']} collections "
             f"with {results['total_changes']} changes{error_status}")
@@ -616,13 +616,15 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
                     logger.error(f"Error saving profiling results: {e}")
 
             # Calculate next run time for notification
-            next_run_time = calculate_schedule() if not args.run_now else None
+            notification_run_time: Optional[datetime] = None
+            if not args.run_now:
+                notification_run_time = calculate_schedule()
 
             # Send notifications
             send_notifications(
                 results=results,
                 state_manager=state_manager,
-                next_run_time=next_run_time
+                next_run_time=notification_run_time
             )
 
             # Exit if run-now mode or termination requested
@@ -843,20 +845,20 @@ If you're seeing this email, your email configuration is working correctly!
         return False
 
 
-def main(args: List[str] = None) -> int:
+def main(args: Optional[List[str]] = None) -> int:
     # Parse arguments
-    args = parse_args(args)
+    parsed_args = parse_args(args)
 
     # Setup signal handlers
     setup_signal_handlers()
 
     # Show version if requested
-    if args.version:
+    if parsed_args.version:
         print(f"Kometa-AI version {__version__}")
         return 0
 
     # Setup logging
-    debug_mode = (args.dump_config or args.dump_state or
+    debug_mode = (parsed_args.dump_config or parsed_args.dump_state or
                   Config.get_bool("DEBUG_LOGGING", False))
     setup_logging(debug=debug_mode)
     logger = logging.getLogger(__name__)
@@ -864,13 +866,13 @@ def main(args: List[str] = None) -> int:
     logger.info(f"Starting Kometa-AI v{__version__}")
 
     # Run health check if requested
-    if args.health_check:
+    if parsed_args.health_check:
         is_healthy = run_health_check()
         logger.info(f"Health check: {'Passed' if is_healthy else 'Failed'}")
         return 0 if is_healthy else 1
 
     # Dump configuration if requested
-    if args.dump_config:
+    if parsed_args.dump_config:
         Config().dump()
         return 0
 
@@ -879,7 +881,7 @@ def main(args: List[str] = None) -> int:
     state_manager = StateManager(state_dir)
 
     # Dump state if requested
-    if args.dump_state:
+    if parsed_args.dump_state:
         try:
             state_manager.load()
             print(state_manager.dump())
@@ -889,7 +891,7 @@ def main(args: List[str] = None) -> int:
         return 0
 
     # Reset state if requested
-    if args.reset_state:
+    if parsed_args.reset_state:
         try:
             state_manager.reset()
             logger.info("State reset successfully")
@@ -899,12 +901,12 @@ def main(args: List[str] = None) -> int:
         return 0
 
     # Send test email if requested
-    if args.send_test_email:
+    if parsed_args.send_test_email:
         success = send_test_email()
         return 0 if success else 1
 
     # Run the main pipeline
-    return run_scheduled_pipeline(args)
+    return run_scheduled_pipeline(parsed_args)
 
 
 if __name__ == "__main__":
