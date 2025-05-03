@@ -21,6 +21,10 @@ fi
 export CI=true
 export SKIP_PRODUCTION_TESTS=true
 
+# Install package in development mode
+echo "Installing package in development mode..."
+pip install -e .
+
 # Run tests with coverage
 echo "Running tests..."
 pytest -xvs $@
