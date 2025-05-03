@@ -1,0 +1,34 @@
+name: Simple CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  simple-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Create test artifact
+      run: |
+        echo "This is a test file" > test-file.txt
+        echo "Contents of current directory:"
+        ls -la
+        echo "Contents of test file:"
+        cat test-file.txt
+        
+    - name: Upload test file
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-file
+        path: test-file.txt

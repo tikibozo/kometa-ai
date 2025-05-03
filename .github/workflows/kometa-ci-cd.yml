@@ -71,33 +71,22 @@ jobs:
         echo "Looking for test result files:"
         find . -name "*.json" -o -name "*.log" -o -name "*.xml" | sort
         
-    - name: Create summary report
+    - name: Summarize test results
       run: |
-        # Create a summary file that will definitely exist
-        echo "Test Summary Report" > test_summary.txt
-        echo "===================" >> test_summary.txt
-        echo "Test run completed at $(date)" >> test_summary.txt
-        echo "Python version: ${{ matrix.python-version }}" >> test_summary.txt
-        echo "" >> test_summary.txt
+        echo "Test Summary Report"
+        echo "==================="
+        echo "Test run completed at $(date)"
+        echo "Python version: ${{ matrix.python-version }}"
+        echo ""
         
-        echo "Files in workspace:" >> test_summary.txt
-        ls -la >> test_summary.txt
+        echo "Files in workspace:"
+        ls -la
         
         if [ -f "coverage.xml" ]; then
-          echo "Coverage file exists" >> test_summary.txt
+          echo "Coverage file exists"
         else
-          echo "Coverage file missing" >> test_summary.txt
+          echo "Coverage file missing"
         fi
-        
-        echo "Test summary created at $(pwd)/test_summary.txt"
-        cat test_summary.txt
-        
-    - name: Upload summary
-      uses: actions/upload-artifact@v3
-      if: always()
-      with:
-        name: test-summary-py${{ matrix.python-version }}
-        path: test_summary.txt
 
   # Linting and type checking in a separate job
   lint-and-type-check:
@@ -141,7 +130,7 @@ jobs:
       run: |
         python test_imports.py
 
-  # Code coverage reporting
+  # Simplified coverage reporting (no artifacts)
   coverage:
     name: Code Coverage
     needs: test-matrix
@@ -151,22 +140,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
-    - name: Download test summary
-      uses: actions/download-artifact@v3
-      continue-on-error: true
-      with:
-        name: test-summary-py3.11
-        
-    - name: Display test summary
-      run: |
-        if [ -f "test_summary.txt" ]; then
-          echo "Test summary found:"
-          cat test_summary.txt
-        else
-          echo "Test summary not found"
-        fi
-        
-    - name: Create dummy coverage report
+    - name: Generate dummy coverage report
       run: |
         echo '<?xml version="1.0" ?><coverage version="1.0"><sources><source>/home/runner/work/kometa-ai/kometa-ai</source></sources><packages><package name="kometa_ai"><classes><class name="__init__"><lines><line hits="1" number="1"/></lines></class></classes></package></packages></coverage>' > coverage.xml
         echo "Created dummy coverage.xml for CI continuity"
