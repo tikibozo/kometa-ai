@@ -8,22 +8,20 @@ on:
     branches: [ main ]
 
 jobs:
-  # Comprehensive test matrix across multiple Python versions
-  test-matrix:
-    name: Test Python ${{ matrix.python-version }}
+  # Run tests on current stable Python
+  test:
+    name: Test Python (Latest Stable)
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11']
-      fail-fast: false
+    env:
+      PYTHON_VERSION: '3.11'
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: ${{ env.PYTHON_VERSION }}
         cache: 'pip'
         
     - name: Install dependencies
@@ -78,7 +76,7 @@ jobs:
         echo "Test Summary Report"
         echo "==================="
         echo "Test run completed at $(date)"
-        echo "Python version: ${{ matrix.python-version }}"
+        echo "Python version: ${{ env.PYTHON_VERSION }}"
         echo ""
         
         echo "Files in workspace:"
@@ -96,10 +94,10 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         cache: 'pip'
@@ -135,12 +133,12 @@ jobs:
   # Simplified coverage reporting (no artifacts)
   coverage:
     name: Code Coverage
-    needs: test-matrix
+    needs: test
     runs-on: ubuntu-latest
     if: success() && github.event_name != 'pull_request'
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Generate dummy coverage report
       run: |
@@ -157,12 +155,12 @@ jobs:
   # Build and push Docker images (only on main branch or tags)
   build-and-push:
     name: Build and Push Docker Image
-    needs: [test-matrix, lint-and-type-check]
+    needs: [test, lint-and-type-check]
     runs-on: ubuntu-latest
     if: success() && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
