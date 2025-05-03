@@ -42,8 +42,12 @@ jobs:
       env:
         SKIP_PRODUCTION_TESTS: "true"
         CI: "true"
+        PYTHONPATH: "."
       run: |
-        # Run tests directly with pytest
+        # Check that state module is importable
+        python -c "from kometa_ai.state import StateManager, DecisionRecord; print(f'State module is importable! StateManager: {StateManager}')"
+        
+        # Run tests with verbosity
         python -m pytest -xvs
         
     - name: List files in workspace (debugging)
