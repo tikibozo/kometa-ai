@@ -22,7 +22,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/tikibozo/kometa-ai",
-    packages=find_packages(),
+    packages=find_packages(include=['kometa_ai', 'kometa_ai.*']),
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
