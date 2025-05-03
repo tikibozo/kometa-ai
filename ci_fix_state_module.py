@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-CI fix for the state module import issues.
-
-This script addresses the root cause of import errors with kometa_ai.state module
-in CI environments by ensuring all module files are properly installed and importable.
-"""
+# CI fix for the state module import issues.
+#
+# This script addresses the root cause of import errors with kometa_ai.state module
+# in CI environments by ensuring all module files are properly installed and importable.
 
 import os
 import sys
@@ -28,7 +26,7 @@ logging.basicConfig(
 logger = logging.getLogger("state_module_fix")
 
 def diagnose_environment() -> Dict[str, Any]:
-    """Diagnose the Python environment for import issues."""
+    # Diagnose the Python environment for import issues.
     results = {
         "python_version": sys.version,
         "python_path": sys.path,
@@ -47,7 +45,7 @@ def diagnose_environment() -> Dict[str, Any]:
 
 
 def check_module_structure(module_dirs: List[str] = None) -> Dict[str, Any]:
-    """Check the kometa_ai module structure, focusing on the state module."""
+    # Check the kometa_ai module structure, focusing on the state module.
     if module_dirs is None:
         module_dirs = [os.getcwd()]
     
@@ -86,7 +84,7 @@ def check_module_structure(module_dirs: List[str] = None) -> Dict[str, Any]:
 
 
 def ensure_py_typed_files(base_dir: str) -> None:
-    """Ensure py.typed files exist in all packages."""
+    # Ensure py.typed files exist in all packages.
     packages = [
         "kometa_ai",
         "kometa_ai/state",
@@ -109,7 +107,7 @@ def ensure_py_typed_files(base_dir: str) -> None:
             init_file = os.path.join(pkg_path, "__init__.py")
             if not os.path.exists(init_file):
                 with open(init_file, "w") as f:
-                    f.write('"""Auto-generated package init."""\n')
+                    f.write('# Auto-generated package init.\n')
                 logger.info(f"Created __init__.py at {init_file}")
         
         # Create py.typed file
@@ -120,11 +118,8 @@ def ensure_py_typed_files(base_dir: str) -> None:
 
 
 def find_source_files(base_dir: str) -> Dict[str, Dict[str, str]]:
-    """Find source state module files in the current directory.
-    
-    Returns:
-        Dictionary with module names as keys and content as values.
-    """
+    # Find source state module files in the current directory.
+    # Returns: Dictionary with module names as keys and content as values.
     source_files = {}
     
     # Define the files we're looking for
@@ -166,21 +161,20 @@ def find_source_files(base_dir: str) -> Dict[str, Dict[str, str]]:
 
 
 def fix_site_packages(diag_results: Dict[str, Any]) -> bool:
-    """Fix the state module in site-packages locations.
-    
-    This function does the following:
-    1. Finds source state module files in the current directory
-    2. For each site-packages directory:
-       a. Creates the kometa_ai and state directories if they don't exist
-       b. Copies the source files to the site-packages location
-       c. If source files don't exist, uses hardcoded implementations
-    
-    Args:
-        diag_results: Dictionary with diagnostic results including site-packages paths
-        
-    Returns:
-        True if at least one site-packages directory was successfully fixed
-    """
+    # Fix the state module in site-packages locations.
+    # 
+    # This function does the following:
+    # 1. Finds source state module files in the current directory
+    # 2. For each site-packages directory:
+    #    a. Creates the kometa_ai and state directories if they don't exist
+    #    b. Copies the source files to the site-packages location
+    #    c. If source files don't exist, uses hardcoded implementations
+    # 
+    # Args:
+    #     diag_results: Dictionary with diagnostic results including site-packages paths
+    #     
+    # Returns:
+    #     True if at least one site-packages directory was successfully fixed
     if not diag_results["site_packages"]:
         logger.error("No site-packages directories found")
         return False
@@ -192,7 +186,7 @@ def fix_site_packages(diag_results: Dict[str, Any]) -> bool:
     source_files = find_source_files(src_dir)
     
     # Hardcoded implementations of the state module files (used as fallback if source files don't exist)
-    state_manager_code = """# mypy: disable-error-code="attr-defined,index,operator,return-value,arg-type"
+    state_manager_code = '''# mypy: disable-error-code="attr-defined,index,operator,return-value,arg-type"
 import os
 import json
 import logging
@@ -475,9 +469,9 @@ class StateManager:
         # Dump state as formatted JSON string.
         # Returns: Formatted JSON
         return json.dumps(self.state, indent=2)
-"""
+'''
 
-    state_models_code = """from dataclasses import dataclass, field
+    state_models_code = '''from dataclasses import dataclass, field
 from typing import Dict, List, Any, Optional
 from datetime import datetime, UTC
 
@@ -528,16 +522,16 @@ class DecisionRecord:
             result['reasoning'] = self.reasoning
 
         return result
-"""
+'''
 
-    state_init_code = """# State management for Kometa-AI.
+    state_init_code = '''# State management for Kometa-AI.
 # This package provides functionality for persisting decisions and state.
 
 from kometa_ai.state.manager import StateManager
 from kometa_ai.state.models import DecisionRecord
 
 __all__ = ['StateManager', 'DecisionRecord']
-"""
+'''
     
     # Track how many site-packages directories were fixed
     fixed_count = 0
@@ -555,7 +549,7 @@ __all__ = ['StateManager', 'DecisionRecord']
             kometa_init = os.path.join(kometa_dir, "__init__.py")
             if not os.path.exists(kometa_init):
                 with open(kometa_init, "w") as f:
-                    f.write('"""kometa-ai package for Claude integration with Radarr."""\n')
+                    f.write('# kometa-ai package for Claude integration with Radarr.\n')
                 logger.info(f"Created {kometa_init}")
             
             # Create py.typed file for the main package
@@ -617,17 +611,16 @@ __all__ = ['StateManager', 'DecisionRecord']
 
 
 def verify_imports() -> bool:
-    """Verify that imports are working properly now.
-    
-    This function does a thorough verification by:
-    1. Clearing importlib cache
-    2. Attempting to import StateManager and DecisionRecord from kometa_ai.state
-    3. Checking if the StateManager can be instantiated
-    4. Verifying module file paths are correct
-    
-    Returns:
-        True if imports are working properly, False otherwise
-    """
+    # Verify that imports are working properly now.
+    # 
+    # This function does a thorough verification by:
+    # 1. Clearing importlib cache
+    # 2. Attempting to import StateManager and DecisionRecord from kometa_ai.state
+    # 3. Checking if the StateManager can be instantiated
+    # 4. Verifying module file paths are correct
+    # 
+    # Returns:
+    #     True if imports are working properly, False otherwise
     # Clear importlib cache to ensure fresh imports
     importlib.invalidate_caches()
     logger.info("Cleared importlib cache")
@@ -706,7 +699,7 @@ def verify_imports() -> bool:
 
 
 def main() -> int:
-    """Main function to fix state module import issues."""
+    # Main function to fix state module import issues.
     logger.info("Starting state module fix for CI environment")
     
     # Step 1: Diagnose environment
