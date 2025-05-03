@@ -30,37 +30,20 @@ jobs:
         pip install -r requirements.txt
         pip install -r requirements-dev.txt
         
-    - name: Setup directory structure
+    - name: Setup for testing
       run: |
-        # Run pre-build setup script
-        chmod +x ./scripts/pre_build_setup.sh
-        ./scripts/pre_build_setup.sh
-        
-    - name: Install package in development mode
-      run: |
+        # Install package in development mode
         pip install -e .
         
-    - name: Ensure state module is properly importable 
-      run: |
-        # Make run_ci_fix.py script executable and run it
-        chmod +x run_ci_fix.py
-        python run_ci_fix.py
-        
-    - name: Create sample data for testing
-      run: |
-        mkdir -p state
-        mkdir -p kometa-config
-        cp config-examples/basic-collections.yml kometa-config/collections.yml
-        
-        # Create test data using script
-        python ci_ensure_test_data.py
+        # Run the consolidated CI setup script
+        python ci_setup.py --verbose
         
     - name: Run tests
       env:
         SKIP_PRODUCTION_TESTS: "true"
         CI: "true"
       run: |
-        # Run tests directly with pytest instead of using a shell script
+        # Run tests directly with pytest
         python -m pytest -xvs
         
     - name: List files in workspace (debugging)
@@ -108,10 +91,10 @@ jobs:
         pip install -r requirements.txt
         pip install -r requirements-dev.txt
         
-    - name: Setup directory structure
+    - name: Setup for type checking
       run: |
-        chmod +x ./scripts/pre_build_setup.sh
-        ./scripts/pre_build_setup.sh
+        # Run the CI setup script with state module only
+        python ci_setup.py --state-module
         
     - name: Lint with flake8
       run: |

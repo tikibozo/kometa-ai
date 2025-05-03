@@ -1,4 +1,5 @@
 # Kometa-AI
+[![Kometa-AI CI/CD](https://github.com/tikibozo/kometa-ai/actions/workflows/kometa-ci-cd.yml/badge.svg?branch=main)](https://github.com/tikibozo/kometa-ai/actions/workflows/kometa-ci-cd.yml)
 
 Kometa-AI integrates Claude AI into Kometa to intelligently select movies for collections based on natural language prompts rather than just metadata tags.
 
