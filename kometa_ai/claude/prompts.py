@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 def get_system_prompt() -> str:
     """Get the system prompt for Claude.
-    
+
     Returns:
         System prompt
     """
@@ -55,10 +55,10 @@ IMPORTANT: Return valid JSON only. Do not include markdown formatting or explana
 
 def format_collection_prompt(collection: CollectionConfig) -> str:
     """Format the prompt for a collection.
-    
+
     Args:
         collection: Collection configuration
-        
+
     Returns:
         Formatted prompt
     """
@@ -67,21 +67,21 @@ def format_collection_prompt(collection: CollectionConfig) -> str:
     logger.debug(f"Collection prompt (type: {type(collection.prompt)}): {repr(collection.prompt)}")
     logger.debug(f"Collection enabled: {collection.enabled}")
     logger.debug(f"Collection confidence: {collection.confidence_threshold}")
-    
+
     # Ensure the prompt is properly formatted
     formatted_prompt = collection.prompt.strip() if collection.prompt else ""
-    
+
     # Check for blank prompt
     if not formatted_prompt:
         logger.warning(f"Collection '{collection.name}' has an empty prompt!")
-    
+
     # More detailed logging for prompt content inspection
     logger.debug(f"Prompt content before formatting (length: {len(formatted_prompt)}):")
     if formatted_prompt:
         # Log each line for debugging bullet points
         for i, line in enumerate(formatted_prompt.split('\n')):
             logger.debug(f"  Prompt line {i}: '{line}'")
-    
+
     # Create the formatted prompt template
     prompt_template = f"""
 I need you to categorize movies for the "{collection.name}" collection.
@@ -95,27 +95,27 @@ The minimum confidence threshold for inclusion is {collection.confidence_thresho
 
 Return your evaluation in the required JSON format ONLY, with no additional text or explanations outside the JSON structure.
 """
-    
+
     # Log the final formatted prompt for verification
     logger.debug(f"Final formatted prompt length: {len(prompt_template)}")
     logger.debug(f"First 100 chars: {prompt_template[:100]}")
     logger.debug(f"Section with bullet points check: {'-' in formatted_prompt}")
     logger.debug(f"Section with criteria: {'COLLECTION DEFINITION AND CRITERIA:' in prompt_template}")
-    
+
     # Log the exact content being sent to Claude
     logger.debug("PROMPT CONTENT START >>>")
     logger.debug(prompt_template)
     logger.debug("<<< PROMPT CONTENT END")
-    
+
     return prompt_template
 
 
 def format_movies_data(movies: List[Movie]) -> str:
     """Format movie data for Claude prompt.
-    
+
     Args:
         movies: List of movies
-        
+
     Returns:
         Formatted movie data
     """
@@ -129,7 +129,7 @@ def format_movies_data(movies: List[Movie]) -> str:
             "genres": movie.genres,
             "overview": movie.overview,
         }
-        
+
         # Add optional metadata if available
         if movie.imdb_id:
             movie_data["imdb_id"] = movie.imdb_id
@@ -147,8 +147,8 @@ def format_movies_data(movies: List[Movie]) -> str:
             ]
         if movie.collection and 'name' in movie.collection:
             movie_data["collection"] = movie.collection.get('name')
-        
+
         movies_data.append(movie_data)
-    
+
     # Return proper JSON string instead of Python string representation
     return json.dumps(movies_data, indent=2)
