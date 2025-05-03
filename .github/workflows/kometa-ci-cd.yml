@@ -1,0 +1,177 @@
+name: Kometa-AI CI/CD
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # Comprehensive test matrix across multiple Python versions
+  test-matrix:
+    name: Test Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+        
+    - name: Setup directory structure
+      run: |
+        # Run pre-build setup script
+        chmod +x ./scripts/pre_build_setup.sh
+        ./scripts/pre_build_setup.sh
+        
+    - name: Install package in development mode
+      run: |
+        pip install -e .
+        
+    - name: Ensure state module is properly importable 
+      run: |
+        # Execute the CI state module fix script
+        python ci_fix_state_module.py
+        
+    - name: Create sample data for testing
+      run: |
+        mkdir -p state
+        mkdir -p kometa-config
+        cp config-examples/basic-collections.yml kometa-config/collections.yml
+        
+        # Create test data using script
+        python ci_ensure_test_data.py
+        
+    - name: Run tests
+      env:
+        SKIP_PRODUCTION_TESTS: "true"
+        CI: "true"
+      run: |
+        python scripts/run_ci_tests.sh --install
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results-py${{ matrix.python-version }}
+        path: |
+          import_test_results.json
+          import_test_results.log
+          state_module_fix.log
+          coverage.xml
+
+  # Linting and type checking in a separate job
+  lint-and-type-check:
+    name: Lint and Type Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+        
+    - name: Setup directory structure
+      run: |
+        chmod +x ./scripts/pre_build_setup.sh
+        ./scripts/pre_build_setup.sh
+        
+    - name: Lint with flake8
+      run: |
+        pip install flake8
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 kometa_ai/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings
+        flake8 kometa_ai/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics
+        
+    - name: Type check with mypy
+      run: |
+        pip install mypy
+        mypy kometa_ai
+        
+    - name: Test imports diagnostics
+      run: |
+        python test_imports.py
+
+  # Code coverage reporting
+  coverage:
+    name: Code Coverage
+    needs: test-matrix
+    runs-on: ubuntu-latest
+    if: success() && github.event_name != 'pull_request'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Download coverage reports
+      uses: actions/download-artifact@v3
+      with:
+        name: test-results-py3.11
+        
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+  # Build and push Docker images (only on main branch or tags)
+  build-and-push:
+    name: Build and Push Docker Image
+    needs: [test-matrix, lint-and-type-check]
+    runs-on: ubuntu-latest
+    if: success() && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Login to DockerHub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    
+    - name: Extract metadata for Docker
+      id: meta
+      uses: docker/metadata-action@v4
+      with:
+        images: tikibozo/kometa-ai
+        tags: |
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=ref,event=branch
+          type=sha,format=short
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=registry,ref=tikibozo/kometa-ai:buildcache
+        cache-to: type=registry,ref=tikibozo/kometa-ai:buildcache,mode=max
