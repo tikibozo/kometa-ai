@@ -63,15 +63,25 @@ jobs:
       run: |
         python scripts/run_ci_tests.sh --install
         
+    - name: List files in workspace (debugging)
+      run: |
+        echo "Current directory contents:"
+        ls -la
+        
+        echo "Looking for test result files:"
+        find . -name "*.json" -o -name "*.log" -o -name "*.xml" | sort
+        
     - name: Upload test results
       uses: actions/upload-artifact@v2
+      if: always()
       with:
         name: test-results-py${{ matrix.python-version }}
         path: |
-          import_test_results.json
-          import_test_results.log
-          state_module_fix.log
-          coverage.xml
+          ./*.json
+          ./*.log
+          ./*.xml
+          ./coverage.xml
+          ./htmlcov/
 
   # Linting and type checking in a separate job
   lint-and-type-check:
@@ -127,10 +137,25 @@ jobs:
     
     - name: Download coverage reports
       uses: actions/download-artifact@v2
+      continue-on-error: true
       with:
         name: test-results-py3.11
         
+    - name: Check for coverage file
+      id: check_coverage
+      run: |
+        if [ -f "./coverage.xml" ]; then
+          echo "COVERAGE_EXISTS=true" >> $GITHUB_OUTPUT
+          echo "Coverage file found"
+          ls -la ./coverage.xml
+        else
+          echo "COVERAGE_EXISTS=false" >> $GITHUB_OUTPUT
+          echo "Coverage file not found"
+          ls -la
+        fi
+        
     - name: Upload coverage to Codecov
+      if: steps.check_coverage.outputs.COVERAGE_EXISTS == 'true'
       uses: codecov/codecov-action@v2
       with:
         file: ./coverage.xml
