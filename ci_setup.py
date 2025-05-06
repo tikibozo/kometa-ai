@@ -887,6 +887,14 @@ class StateManager:
         """Get recent errors."""
         return []
         
+    def clear_errors(self) -> None:
+        """Clear all error records."""
+        self.state['errors'] = []
+        
+    def clear_changes(self) -> None:
+        """Clear all change records."""
+        self.state['changes'] = []
+        
     def reset(self) -> None:
         """Reset state to empty."""
         pass
