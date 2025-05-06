@@ -13,7 +13,7 @@ Kometa-AI is a dockerized Python application that:
 
 In short, once you set this up you can simply add a Radarr collection (with a special comment block) to your Kometa config, Kometa-AI will run, then the next time Kometa runs it will populate the collection in Plex. 
 
-**This project is not associated with Kometa directly**, I'm just a fan. This is also explicitly designed to not interfere with Kometa's processing in any way - it just looks at the configuration (which is why our config is in a comment block), and then puts data in Radarr so Kometa can use it.
+**This project is not associated with Kometa directly**, I'm just a fan. This is also explicitly designed to not interfere with Kometa's processing in any way - it just looks at the configuration, and then puts data in Radarr so Kometa can use it.
 
 ## Collection Configuration
 ```yaml
@@ -70,7 +70,7 @@ See [Claude Console](https://console.anthropic.com/settings/keys) to sign up/cre
 
 ## Installation and Deployment
 
-## Docker Deployment
+### Docker Deployment
 
 ```yaml
 services:
@@ -101,7 +101,7 @@ services:
       start_period: 1m
 ```
 
-## Environment Variables
+### Environment Variables
 
 - `RADARR_URL`: Base URL for Radarr instance
 - `RADARR_API_KEY`: API key for Radarr authentication
@@ -117,7 +117,7 @@ services:
 
 For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
-## Command Line Options
+### Command Line Options
 
 ```
 Usage: python -m kometa_ai [OPTIONS]
