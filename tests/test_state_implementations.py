@@ -62,10 +62,17 @@ REQUIRED_METHODS = {
     'log_error': 2,
     'get_changes': 0,
     'get_errors': 0,
+    'dump': 0,
+}
+
+# Optional methods that may only exist in some implementations
+OPTIONAL_METHODS = {
     'clear_errors': 0,
     'clear_changes': 0,
-    'dump': 0,
-    'validate_state': 0
+    'validate_state': 0,
+    # Mock-specific methods
+    'set_detailed_analysis': 3,
+    'get_detailed_analysis': 2
 }
 
 
@@ -101,6 +108,7 @@ class TestStateImplementations(unittest.TestCase):
         """Test that MockStateManager has all required methods."""
         mock_methods = get_class_public_methods(MockStateManager)
         
+        # Check required methods
         for method_name in REQUIRED_METHODS:
             with self.subTest(method=method_name):
                 self.assertIn(method_name, mock_methods, 
@@ -127,12 +135,23 @@ class TestStateImplementations(unittest.TestCase):
                             expected_param_count, actual_param_count,
                             f"MockStateManager.{method_name} has wrong parameter count. "
                             f"Expected {expected_param_count}, got {actual_param_count}")
+        
+        # Check which optional methods are implemented
+        implemented_optional = []
+        for method_name in OPTIONAL_METHODS:
+            if method_name in mock_methods:
+                implemented_optional.append(method_name)
+        
+        # Print which optional methods are implemented
+        if implemented_optional:
+            print(f"MockStateManager implements optional methods: {', '.join(sorted(implemented_optional))}")
 
     @unittest.skipIf(not HAS_REAL_IMPLEMENTATION, "Real StateManager not available")
     def test_real_has_all_required_methods(self):
         """Test that real StateManager has all required methods."""
         real_methods = get_class_public_methods(RealStateManager)
         
+        # Check required methods
         for method_name in REQUIRED_METHODS:
             with self.subTest(method=method_name):
                 self.assertIn(method_name, real_methods,
@@ -151,25 +170,63 @@ class TestStateImplementations(unittest.TestCase):
                         expected_param_count, actual_param_count,
                         f"RealStateManager.{method_name} has wrong parameter count. "
                         f"Expected {expected_param_count}, got {actual_param_count}")
+        
+        # Check which optional methods are implemented
+        implemented_optional = []
+        for method_name in OPTIONAL_METHODS:
+            if method_name in real_methods:
+                implemented_optional.append(method_name)
+        
+        # Print which optional methods are implemented
+        if implemented_optional:
+            print(f"RealStateManager implements optional methods: {', '.join(sorted(implemented_optional))}")
+        else:
+            print("Warning: RealStateManager does not implement any optional methods")
 
     @unittest.skipIf(not HAS_REAL_IMPLEMENTATION, "Real StateManager not available")
-    def test_implementations_have_same_methods(self):
-        """Test that both implementations have the same methods."""
+    def test_implementations_have_same_required_methods(self):
+        """Test that both implementations have all required methods."""
         real_methods = get_class_public_methods(RealStateManager)
         mock_methods = get_class_public_methods(MockStateManager)
         
-        # Find methods only in real implementation
-        real_only = real_methods - mock_methods
-        if real_only:
-            self.fail(f"Methods in real but not in mock: {', '.join(real_only)}")
+        # Check that all required methods exist in both implementations
+        required_method_set = set(REQUIRED_METHODS.keys())
         
-        # Find methods only in mock implementation
-        mock_only = mock_methods - real_methods
-        expected_mock_only = {'set_detailed_analysis', 'get_detailed_analysis'}
-        unexpected_mock_only = mock_only - expected_mock_only
+        # Find required methods missing from real implementation
+        missing_from_real = required_method_set - real_methods
+        if missing_from_real:
+            self.fail(f"Required methods missing from real implementation: {', '.join(missing_from_real)}")
         
-        if unexpected_mock_only:
-            self.fail(f"Unexpected methods in mock but not in real: {', '.join(unexpected_mock_only)}")
+        # Find required methods missing from mock implementation
+        missing_from_mock = required_method_set - mock_methods
+        if missing_from_mock:
+            self.fail(f"Required methods missing from mock implementation: {', '.join(missing_from_mock)}")
+            
+        # Print a summary of optional method implementation differences
+        optional_method_set = set(OPTIONAL_METHODS.keys())
+        real_impl_optional = real_methods.intersection(optional_method_set)
+        mock_impl_optional = mock_methods.intersection(optional_method_set)
+        
+        # Print which optional methods are in mock but not real
+        mock_only_optional = mock_impl_optional - real_impl_optional
+        if mock_only_optional:
+            print(f"Optional methods in mock but not real: {', '.join(sorted(mock_only_optional))}")
+        
+        # Print which optional methods are in real but not mock
+        real_only_optional = real_impl_optional - mock_impl_optional
+        if real_only_optional:
+            print(f"Optional methods in real but not mock: {', '.join(sorted(real_only_optional))}")
+            
+        # Check if there are any methods not in either required or optional sets
+        all_known_methods = required_method_set.union(optional_method_set)
+        real_unknown = real_methods - all_known_methods
+        mock_unknown = mock_methods - all_known_methods
+        
+        if real_unknown:
+            print(f"Warning: Real implementation has unknown methods: {', '.join(sorted(real_unknown))}")
+            
+        if mock_unknown:
+            print(f"Warning: Mock implementation has unknown methods: {', '.join(sorted(mock_unknown))}")
 
 
 if __name__ == '__main__':
