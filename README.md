@@ -1,7 +1,7 @@
 # Kometa-AI
 [![Kometa-AI CI/CD](https://github.com/tikibozo/kometa-ai/actions/workflows/kometa-ci-cd.yml/badge.svg?branch=main)](https://github.com/tikibozo/kometa-ai/actions/workflows/kometa-ci-cd.yml)
 
-Kometa-AI integrates Claude AI as a pre-processor of Kometa configurations to intelligently select movies for collections based on natural language prompts.
+Kometa-AI integrates [Claude AI](https://claude.ai) as a pre-processor of [Kometa](https://kometa.wiki/) configurations to intelligently select movies for collections based on natural language prompts.
 
 ## Overview
 
@@ -11,9 +11,32 @@ Kometa-AI is a dockerized Python application that:
 3. Asks Claude to evaluate if each movie should be in the defined collection based on the provided prompt
 4. Updates tags in Radarr accordingly so Kometa can do the actual collection updating in Plex
 
-In short, once you set this up, you can simply add a comment block to an existing Kometa (Radarr) collection, Kometa-AI will pre-process your movies based on the provided prompt, store the results as a tag collection in Radarr, and then the next time Kometa runs it will execute the Radarr tag builder to populate the collection in Plex. 
+In short, once you set this up you can simply add a Radarr collection (with a special comment block) to your Kometa config, Kometa-AI will run, then the next time Kometa runs it will populate the collection in Plex. 
 
-This project is not associated with Kometa directly, I'm just a fan. This is also explicitly designed to not interfere with Kometa's processing in any way - it just looks at the configuration (which is why our config is in a comment block), and then puts data in Radarr so Kometa can use it.
+**This project is not associated with Kometa directly**, I'm just a fan. This is also explicitly designed to not interfere with Kometa's processing in any way - it just looks at the configuration (which is why our config is in a comment block), and then puts data in Radarr so Kometa can use it.
+
+## Collection Configuration
+```yaml
+collections:
+
+  # === KOMETA-AI ===
+  # enabled: true
+  # confidence_threshold: 0.7
+  # prompt: |
+  #   Identify film noir movies based on these criteria:
+  #   - Made primarily between 1940-1959
+  #   - Dark, cynical themes and moral ambiguity
+  #   - Visual style emphasizing shadows, unusual angles
+  #   - Crime or detective storylines
+  #   - Femme fatale character often present
+  # === END KOMETA-AI ===
+  Film Noir:
+    radarr_taglist: KAI-film-noir
+
+    # ... existing Kometa config ...
+```
+
+There are more example collections in the `config-examples` directory.
 
 ## But why though? What problem does this solve?
 So I started off giving Claude my Radarr db and the kometa community repo, and asked it to come up with ideas for collections (try it! it's fun.) It came up with some really great ideas for collections! However implementing these interesting collections meant figuring out either a metadata scheme (between x release dates from y directors, etc.) or trying to find someone who had already done the work to build the movie list and created an imdb list (or similar.) Some of the collections worked fine this way, but for others I needed a way to have Claude decide which movies should be in the interesting new collection we came up with. 
@@ -45,30 +68,6 @@ See [Claude Console](https://console.anthropic.com/settings/keys) to sign up/cre
 3. **Scheduling**: The script manages its own scheduling based on environment variables
 4. **Notifications**: Email notifications summarize changes and errors
 
-## Collection Configuration
-
-Extend Kometa's existing collection definition files with special comment blocks placed above the collection name:
-
-```yaml
-collections:
-  # === KOMETA-AI ===
-  # enabled: true
-  # confidence_threshold: 0.7
-  # prompt: |
-  #   Identify film noir movies based on these criteria:
-  #   - Made primarily between 1940-1959
-  #   - Dark, cynical themes and moral ambiguity
-  #   - Visual style emphasizing shadows, unusual angles
-  #   - Crime or detective storylines
-  #   - Femme fatale character often present
-  # === END KOMETA-AI ===
-  Film Noir:
-    radarr_taglist: KAI-film-noir
-    # ... existing Kometa config ...
-```
-
-Many example collections are provided in the `config-examples` directory.
-
 ## Installation and Deployment
 
 ## Docker Deployment
@@ -76,7 +75,7 @@ Many example collections are provided in the `config-examples` directory.
 ```yaml
 services:
   kometa-ai:
-    image: kometa-ai:latest
+    image: tikibozo/kometa-ai:latest
     container_name: kometa-ai
     volumes:
       - ./kometa-config:/app/kometa-config
