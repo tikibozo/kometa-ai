@@ -314,14 +314,6 @@ class StateManager:
         """
         return self.state.get('errors', [])
 
-    def clear_errors(self) -> None:
-        """Clear all error records."""
-        self.state['errors'] = []
-
-    def clear_changes(self) -> None:
-        """Clear all change records."""
-        self.state['changes'] = []
-
     def dump(self) -> str:
         """Dump state as formatted JSON string.
 
@@ -329,55 +321,3 @@ class StateManager:
             Formatted JSON
         """
         return json.dumps(self.state, indent=2)
-        
-    def validate_state(self) -> List[str]:
-        """Validate the state structure for consistency.
-        
-        Checks that the state dictionary has the expected keys and structure.
-        
-        Returns:
-            List of validation error messages, empty if valid
-        """
-        errors = []
-        
-        # Check required top-level keys
-        required_keys = {'version', 'state_format_version', 'last_update', 'decisions', 'changes', 'errors'}
-        missing_keys = required_keys - set(self.state.keys())
-        if missing_keys:
-            errors.append(f"Missing required keys: {', '.join(missing_keys)}")
-            
-        # Check state_format_version
-        if self.state.get('state_format_version') != self.STATE_VERSION:
-            errors.append(f"Invalid state_format_version: {self.state.get('state_format_version')} != {self.STATE_VERSION}")
-            
-        # Check that decisions is a dictionary
-        if not isinstance(self.state.get('decisions', {}), dict):
-            errors.append("'decisions' is not a dictionary")
-            
-        # Check that changes is a list
-        if not isinstance(self.state.get('changes', []), list):
-            errors.append("'changes' is not a list")
-            
-        # Check that errors is a list
-        if not isinstance(self.state.get('errors', []), list):
-            errors.append("'errors' is not a list")
-            
-        # Check decision structure for a sample decision if any exist
-        decisions = self.state.get('decisions', {})
-        if decisions:
-            # Check the first movie entry
-            first_movie_key = next(iter(decisions), None)
-            if first_movie_key:
-                movie_data = decisions[first_movie_key]
-                
-                # Check that it has a collections key
-                if 'collections' not in movie_data:
-                    errors.append(f"Movie {first_movie_key} missing 'collections' key")
-                elif not isinstance(movie_data['collections'], dict):
-                    errors.append(f"Movie {first_movie_key} 'collections' is not a dictionary")
-                    
-                # Check for metadata_hash
-                if 'metadata_hash' not in movie_data:
-                    errors.append(f"Movie {first_movie_key} missing 'metadata_hash' key")
-                
-        return errors

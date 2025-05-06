@@ -274,6 +274,15 @@ collections:
   # === END KOMETA-AI ===
   Drama:
     radarr_taglist: KAI-drama
+    
+  # === KOMETA-AI ===
+  # enabled: true
+  # prompt: |
+  #   Identify comedy movies based on humor and laughter.
+  # confidence_threshold: 0.75
+  # === END KOMETA-AI ===
+  Comedy:
+    radarr_taglist: KAI-funny
     """
     
     with open(os.path.join(config_dir, "collections.yml"), "w") as f:
@@ -295,6 +304,9 @@ collections:
     parser_mock.parse_configs.return_value = collections
     
     # Register cleanup
+    # Create a real KometaParser instance for the test
+    parser = KometaParser(config_dir)
+        
     yield {
         "temp_dir": temp_dir,
         "state_dir": state_dir,
@@ -304,6 +316,7 @@ collections:
         "email_notifier": email_notifier,
         "state_manager": state_manager,
         "parser_mock": parser_mock,
+        "parser": parser,
         "movies": movies,
         "collections": collections
     }
@@ -586,6 +599,44 @@ class TestEndToEndPipeline:
                 assert result == 0
                 mock_calculate.assert_called_once()
                 mock_sleep.assert_called_once_with(next_run_time)
+                
+    def test_tag_mismatch_detection_in_pipeline(self, test_env, monkeypatch, caplog):
+        """Test that tag mismatches are detected and reported in the pipeline."""
+        # Access the parser and files
+        parser = test_env["parser"]
+        
+        # Temporarily disable auto-fix
+        monkeypatch.setenv('KOMETA_FIX_TAGS', 'false')
+        
+        # Process the yaml files
+        files = parser.find_yaml_files()
+        blocks = parser.extract_ai_blocks(files[0])
+        
+        # Check for the mismatched tag warning for Comedy collection
+        assert "Mismatched tag for collection 'Comedy'" in caplog.text
+        assert "Expected: KAI-comedy, Found: KAI-funny" in caplog.text
+        
+    def test_tag_mismatch_correction_in_pipeline(self, test_env, monkeypatch):
+        """Test that tag mismatches are auto-fixed in the pipeline when enabled."""
+        # Access the parser and files
+        parser = test_env["parser"]
+        config_dir = test_env["config_dir"]
+        
+        # Enable auto-fix
+        monkeypatch.setenv('KOMETA_FIX_TAGS', 'true')
+        
+        # Process the yaml files
+        files = parser.find_yaml_files()
+        blocks = parser.extract_ai_blocks(files[0])
+        
+        # Read the file content to check if tag was fixed
+        file_path = os.path.join(config_dir, "collections.yml")
+        with open(file_path, 'r') as f:
+            content = f.read()
+        
+        # Check that tag was fixed
+        assert "radarr_taglist: KAI-comedy" in content
+        assert "radarr_taglist: KAI-funny" not in content
 
 
 if __name__ == "__main__":

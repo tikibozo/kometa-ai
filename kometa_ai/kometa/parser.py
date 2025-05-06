@@ -1,10 +1,12 @@
 import re
+import os
 import logging
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional, Tuple
 
 from ruamel.yaml import YAML
 from kometa_ai.kometa.models import CollectionConfig
+from kometa_ai.utils.helpers import slugify
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +17,7 @@ class KometaParser:
     # Patterns for AI configuration blocks
     START_MARKER = r"#\s*===\s*KOMETA-AI\s*===\s*"
     END_MARKER = r"#\s*===\s*END\s*KOMETA-AI\s*===\s*"
+    TAG_PREFIX = "KAI-"
 
     def __init__(self, config_dir: str):
         """Initialize the parser.
@@ -25,6 +28,8 @@ class KometaParser:
         self.config_dir = Path(config_dir)
         self.yaml = YAML()
         self.yaml.preserve_quotes = True
+        # Check for environment variable to control tag correction
+        self.auto_fix_tags = os.environ.get('KOMETA_FIX_TAGS', '').lower() in ('true', 'yes', '1')
 
     def find_yaml_files(self) -> List[Path]:
         """Find all YAML files in the configuration directory.
@@ -90,6 +95,28 @@ class KometaParser:
                 # Process the block with simplified approach
                 config_dict = self.process_config_block(block_text)
 
+                # Check radarr_taglist if this is an enabled collection
+                if config_dict.get('enabled', False):
+                    # Check if the radarr_taglist matches the expected format
+                    is_valid, current_tag = self.check_radarr_taglist(file_path, collection_name)
+                    if current_tag is not None:  # Only proceed if we found a radarr_taglist
+                        if not is_valid:
+                            expected_tag = self.get_expected_tag(collection_name)
+                            logger.warning(
+                                f"Mismatched tag for collection '{collection_name}' in {file_path}. "
+                                f"Expected: {expected_tag}, Found: {current_tag}"
+                            )
+                            # Auto-fix if enabled
+                            if self.auto_fix_tags:
+                                if self.fix_radarr_taglist(file_path, collection_name, current_tag):
+                                    logger.info(f"Fixed tag for collection '{collection_name}' in {file_path}")
+                                else:
+                                    logger.error(f"Failed to fix tag for collection '{collection_name}' in {file_path}")
+                            else:
+                                logger.info(
+                                    "Set environment variable KOMETA_FIX_TAGS=true to automatically fix mismatched tags"
+                                )
+
                 # Log the result for debugging
                 logger.debug(f"Extracted config for {collection_name}: {config_dict}")
                 result[collection_name] = config_dict
@@ -100,6 +127,89 @@ class KometaParser:
 
         return result
 
+    def get_expected_tag(self, collection_name: str) -> str:
+        """Get the expected tag for a collection.
+
+        Args:
+            collection_name: Collection name
+
+        Returns:
+            Expected tag in the format "KAI-<slugified-name>"
+        """
+        return f"{self.TAG_PREFIX}{slugify(collection_name)}"
+    
+    def check_radarr_taglist(self, file_path: Path, collection_name: str) -> Tuple[bool, Optional[str]]:
+        """Check if the radarr_taglist for a collection matches the expected format.
+
+        Args:
+            file_path: Path to the YAML file
+            collection_name: Collection name
+
+        Returns:
+            Tuple of (is_valid, current_value) where is_valid is True if the tag matches the expected format
+        """
+        # Load the YAML file
+        with open(file_path, 'r') as f:
+            try:
+                data = self.yaml.load(f)
+            except Exception as e:
+                logger.error(f"Error loading YAML file {file_path}: {e}")
+                return False, None
+                
+        if not data or not isinstance(data, dict) or 'collections' not in data:
+            logger.warning(f"No collections found in {file_path}")
+            return False, None
+            
+        collections = data.get('collections', {})
+        if not collections or collection_name not in collections:
+            logger.warning(f"Collection '{collection_name}' not found in {file_path}")
+            return False, None
+            
+        collection_data = collections[collection_name]
+        if not isinstance(collection_data, dict) or 'radarr_taglist' not in collection_data:
+            logger.warning(f"No radarr_taglist found for collection '{collection_name}' in {file_path}")
+            return False, None
+            
+        current_tag = collection_data['radarr_taglist']
+        expected_tag = self.get_expected_tag(collection_name)
+        
+        return current_tag == expected_tag, current_tag
+    
+    def fix_radarr_taglist(self, file_path: Path, collection_name: str, current_tag: str) -> bool:
+        """Fix the radarr_taglist for a collection.
+
+        Args:
+            file_path: Path to the YAML file
+            collection_name: Collection name
+            current_tag: Current radarr_taglist value
+
+        Returns:
+            True if the fix was applied successfully
+        """
+        expected_tag = self.get_expected_tag(collection_name)
+        
+        # Read the file content as text
+        with open(file_path, 'r') as f:
+            content = f.read()
+        
+        # Create a pattern to find the radarr_taglist line for this collection
+        # This is more reliable than modifying the YAML structure directly, as it preserves formatting
+        pattern = fr'({collection_name}:(?:\s*\n\s+.*)*\s+radarr_taglist:\s*)({re.escape(current_tag)})'
+        replacement = fr'\1{expected_tag}'
+        
+        new_content = re.sub(pattern, replacement, content)
+        
+        if new_content == content:
+            logger.warning(f"Failed to replace tag in {file_path} for '{collection_name}'")
+            return False
+            
+        # Write the modified content back to the file
+        with open(file_path, 'w') as f:
+            f.write(new_content)
+            
+        logger.info(f"Fixed radarr_taglist for '{collection_name}' in {file_path}: {current_tag} -> {expected_tag}")
+        return True
+    
     def process_config_block(self, block_text: str) -> Dict[str, Any]:
         """Process a configuration block and extract key-value pairs.
 

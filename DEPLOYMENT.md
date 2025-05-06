@@ -76,6 +76,7 @@ Kometa-AI can be installed using Docker or directly from source. The recommended
          - SMTP_USE_TLS=true
          - NOTIFICATION_RECIPIENTS=user@example.com
          - NOTIFICATION_FROM=kometa-ai@example.com
+         - KOMETA_FIX_TAGS=false
        restart: unless-stopped
        healthcheck:
          test: ["CMD", "python", "-m", "kometa_ai", "--health-check"]
@@ -118,6 +119,7 @@ docker run -d \
   -e SMTP_USE_TLS=true \
   -e NOTIFICATION_RECIPIENTS=user@example.com \
   -e NOTIFICATION_FROM=kometa-ai@example.com \
+  -e KOMETA_FIX_TAGS=false \
   -v /path/to/kometa-config:/app/kometa-config \
   -v /path/to/state:/app/state \
   -v /path/to/logs:/app/logs \
@@ -167,6 +169,7 @@ If you need to build the image yourself:
 | `NOTIFY_ON_NO_CHANGES` | Send notifications even when no changes occurred | false | No |
 | `NOTIFY_ON_ERRORS_ONLY` | Only send notifications when errors occur | false | No |
 | `BATCH_SIZE` | Number of movies per batch in Claude API calls | 150 | No |
+| `KOMETA_FIX_TAGS` | Automatically fix inconsistent tags in Radarr | false | No |
 
 ### Kometa Configuration
 

@@ -1,18 +1,31 @@
 # Kometa-AI
 [![Kometa-AI CI/CD](https://github.com/tikibozo/kometa-ai/actions/workflows/kometa-ci-cd.yml/badge.svg?branch=main)](https://github.com/tikibozo/kometa-ai/actions/workflows/kometa-ci-cd.yml)
 
-Kometa-AI integrates Claude AI into Kometa to intelligently select movies for collections based on natural language prompts rather than just metadata tags.
+Kometa-AI integrates Claude AI as a pre-processor of Kometa configurations to intelligently select movies for collections based on natural language prompts.
 
 ## Overview
 
-Kometa-AI is a production-ready, dockerized Python application that:
+Kometa-AI is a dockerized Python application that:
+1. Examines your existing Kometa configuration looking for AI-tagged collections
+2. Queries your existing Radarr instance for movies
+3. Asks Claude to evaluate if each movie should be in the defined collection based on the provided prompt
+4. Updates tags in Radarr accordingly so Kometa can do the actual collection updating in Plex
 
-1. Queries Radarr for movies, metadata, and tags
-2. Examines AI-tagged collections in Kometa configuration
-3. Evaluates movies using Claude AI against provided prompts
-4. Updates tags in Radarr accordingly
+In short, once you set this up, you can simply add a comment block to an existing Kometa (Radarr) collection, Kometa-AI will pre-process your movies based on the provided prompt, store the results as a tag collection in Radarr, and then the next time Kometa runs it will execute the Radarr tag builder to populate the collection in Plex. 
 
-Kometa can then consume this output as a standard Radarr tag collection, creating a bridge between Radarr's tagging system and Kometa's collection management.
+This project is not associated with Kometa directly, I'm just a fan. This is also explicitly designed to not interfere with Kometa's processing in any way - it just looks at the configuration (which is why our config is in a comment block), and then puts data in Radarr so Kometa can use it.
+
+## But why though? What problem does this solve?
+So I started off giving Claude my Radarr db and the kometa community repo, and asked it to come up with ideas for collections (try it! it's fun.) It came up with some really great ideas for collections! However implementing these interesting collections meant figuring out either a metadata scheme (between x release dates from y directors, etc.) or trying to find someone who had already done the work to build the movie list and created an imdb list (or similar.) Some of the collections worked fine this way, but for others I needed a way to have Claude decide which movies should be in the interesting new collection we came up with. 
+
+So that's what this does - give it some interesting collection name/prompt, and it'll figure out which of your movies should be in it. The possibilties are endless!
+
+## This thing costs money, but not like that
+While this project is MIT Licensed open source, **THIS APP REQUIRES A CLAUDE/ANTHROPIC API KEY. YOU'LL HAVE TO SPEND ACTUAL MONEY IN ORDER TO USE IT.** It won't cost much, and there are features designed to minimize costs. But calling into Claude via programmatic means is not free, and is also separate from the chat subscription. The app will report the acutal costs it incurs (which is usually very little per run) though larger libraries will end up costing additional money for new collections as it needs to evaluate each movie for suitability in the collection which is a "# of movies -> cost" scale point. 
+
+Kometa-AI saves results, so unless you change the collection or movie definition, it won't re-evaluate each movie against each collection on each run. Once the first run of a given collection is completed, it'll just send up new or changed movies for evaluation. 
+
+See [Claude Console](https://console.anthropic.com/settings/keys) to sign up/create an API key for use with Kometa-AI.
 
 ## Features
 
@@ -23,6 +36,7 @@ Kometa can then consume this output as a standard Radarr tag collection, creatin
 - **Email Notifications**: Comprehensive email reports of changes and errors
 - **Performance Optimization**: Memory-efficient design for libraries of any size
 - **Production-Ready Deployment**: Complete Docker-based deployment with security best practices
+- **Tag Consistency**: Automatic detection and optional correction of mismatched radarr_taglist values
 
 ## How It Works
 
@@ -57,41 +71,9 @@ Many example collections are provided in the `config-examples` directory.
 
 ## Installation and Deployment
 
-### Quick Start
-
-1. Clone the repository
-2. Create configuration directories:
-   ```bash
-   mkdir -p kometa-ai/{kometa-config,state,logs}
-   ```
-3. Copy your Kometa collection configuration files to `kometa-ai/kometa-config/`
-4. Edit `docker-compose.yml` with your environment variables
-5. Start the container:
-   ```bash
-   docker-compose up -d
-   ```
-
-For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
-
-## Environment Variables
-
-- `RADARR_URL`: Base URL for Radarr instance
-- `RADARR_API_KEY`: API key for Radarr authentication
-- `CLAUDE_API_KEY`: API key for Claude AI
-- `DEBUG_LOGGING`: Boolean flag to enable detailed logging (default: false)
-- `SMTP_SERVER`: SMTP server address
-- `SMTP_PORT`: SMTP port (default: 25)
-- `NOTIFICATION_RECIPIENTS`: Comma-separated list of email recipients
-- `SCHEDULE_INTERVAL`: Parsable time interval (e.g., "1h", "1d", "1w", "1mo")
-- `SCHEDULE_START_TIME`: Start time in 24hr format (e.g., "03:00")
-- `TZ`: Time zone for scheduling (default: UTC)
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for the complete list of configuration options.
-
 ## Docker Deployment
 
 ```yaml
-version: '3'
 services:
   kometa-ai:
     image: kometa-ai:latest
@@ -110,6 +92,7 @@ services:
       - SCHEDULE_INTERVAL=1d
       - SCHEDULE_START_TIME=03:00
       - TZ=America/New_York
+      - KOMETA_FIX_TAGS=false
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-m", "kometa_ai", "--health-check"]
@@ -118,6 +101,22 @@ services:
       retries: 3
       start_period: 1m
 ```
+
+## Environment Variables
+
+- `RADARR_URL`: Base URL for Radarr instance
+- `RADARR_API_KEY`: API key for Radarr authentication
+- `CLAUDE_API_KEY`: API key for Claude AI
+- `DEBUG_LOGGING`: Boolean flag to enable detailed logging (default: false)
+- `SMTP_SERVER`: SMTP server address
+- `SMTP_PORT`: SMTP port (default: 25)
+- `NOTIFICATION_RECIPIENTS`: Comma-separated list of email recipients
+- `SCHEDULE_INTERVAL`: Parsable time interval (e.g., "1h", "1d", "1w", "1mo")
+- `SCHEDULE_START_TIME`: Start time in 24hr format (e.g., "03:00")
+- `TZ`: Time zone for scheduling (default: UTC)
+- `KOMETA_FIX_TAGS`: Boolean flag to automatically fix mismatched radarr_taglist values (default: false)
+
+For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Command Line Options
 
@@ -160,14 +159,3 @@ For development setup and guidelines, see [DEVELOPMENT.md](DEVELOPMENT.md).
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Complete deployment guide and configuration reference
 - [DEVELOPMENT.md](DEVELOPMENT.md) - Development setup and guidelines
 - [config-examples/](config-examples/) - Example collection configurations
-
-## Project Status
-
-This project has completed all planned development stages and is now production-ready.
-
-- ✅ Stage 1: Core Infrastructure and Docker Setup
-- ✅ Stage 2: Radarr Integration
-- ✅ Stage 3: Claude Integration
-- ✅ Stage 4: Full Pipeline
-- ✅ Stage 5: Performance and Scaling
-- ✅ Stage 6: Production Deployment

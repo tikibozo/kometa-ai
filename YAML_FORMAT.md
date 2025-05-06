@@ -75,6 +75,7 @@ This ordering ensures that configuration options aren't accidentally included in
 4. The Kometa collection name must immediately follow the end marker.
 5. **REQUIRED ORDER**: Standard configuration options FIRST, prompt LAST.
 6. The `prompt` must be placed immediately before the `=== END KOMETA-AI ===` marker.
+7. The `radarr_taglist` value must follow the format `KAI-<slugified-collection-name>`, where the slugified name consists of lowercase letters, numbers, and hyphens. For example, the collection "Film Noir" should use the tag `KAI-film-noir`.
 
 ## Example Files
 
@@ -89,5 +90,27 @@ The parser will:
 2. Parse configuration options (enabled, confidence_threshold, priority, etc.)
 3. Extract the multi-line prompt, preserving all text including bullet points
 4. Filter out configuration lines that might accidentally be included in the prompt
+5. Validate that the `radarr_taglist` value matches the expected format (`KAI-<slugified-collection-name>`)
+6. Issue warnings for any mismatched tags found
 
 This ensures that all bullet points and formatting in your prompt are preserved when sent to Claude AI.
+
+## Tag Mismatch Detection and Correction
+
+The parser includes a feature to detect and optionally correct mismatched tags:
+
+1. **Detection**: When enabled collections are processed, the parser checks if the `radarr_taglist` value matches the expected format based on the collection name. If a mismatch is found, a warning is logged.
+
+2. **Correction**: You can enable automatic correction of mismatched tags by setting the environment variable:
+   ```
+   KOMETA_FIX_TAGS=true
+   ```
+   
+   When this variable is enabled, the parser will automatically update any mismatched `radarr_taglist` values to match the expected format (`KAI-<slugified-collection-name>`).
+
+3. **Slugifying Process**: Collection names are transformed by:
+   - Converting to lowercase
+   - Replacing spaces and special characters with hyphens
+   - Removing leading/trailing hyphens
+
+This feature helps maintain consistency between collection names and their associated tags, ensuring proper integration with the Radarr tagging system.
