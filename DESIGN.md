@@ -114,9 +114,7 @@ collections:
   # confidence_threshold: 0.7
   # === END KOMETA-AI ===
   Film Noir:
-    plex_search:
-      all:
-        genre: Film-Noir
+    radarr_taglist: KAI-film-noir
     # ... existing Kometa config ...
 ```
 

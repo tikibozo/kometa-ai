@@ -16,9 +16,7 @@ collections:
   # priority: 2
   # === END KOMETA-AI ===
   World Cinema Essentials:
-    plex_search:
-      all:
-        country.not: United States
+    radarr_taglist: KAI-world-cinema-essentials
 
   # === KOMETA-AI ===
   # enabled: true
@@ -40,12 +38,7 @@ collections:
   # exclude_tags: KAI-straightforward-narratives
   # === END KOMETA-AI ===
   Innovative Narratives:
-    plex_search:
-      any:
-        genre:
-          - Drama
-          - Mystery
-          - Thriller
+    radarr_taglist: KAI-innovative-narratives
 
   # === KOMETA-AI ===
   # enabled: true
@@ -67,6 +60,4 @@ collections:
   # include_tags: KAI-award-winning
   # === END KOMETA-AI ===
   Visual Masterpieces:
-    plex_search:
-      all:
-        title: ""
+    radarr_taglist: KAI-visual-masterpieces

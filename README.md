@@ -49,9 +49,7 @@ collections:
   #   - Femme fatale character often present
   # === END KOMETA-AI ===
   Film Noir:
-    plex_search:
-      all:
-        genre: Film-Noir
+    radarr_taglist: KAI-film-noir
     # ... existing Kometa config ...
 ```
 

@@ -550,9 +550,7 @@ collections:
   #     reason: "Opens with a bank robbery but is a superhero film, not a heist movie"
   # === END KOMETA-AI ===
   Heist Movies:
-    plex_search:
-      all:
-        genre: Heist
+    radarr_taglist: KAI-heist-movies
     # ... existing Kometa config ...
 ```
 

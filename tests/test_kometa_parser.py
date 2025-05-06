@@ -26,9 +26,7 @@ class TestKometaParser:
   # prompt: Identify film noir movies based on these criteria- Made primarily between 1940-1959, Dark, cynical themes and moral ambiguity
   # === END KOMETA-AI ===
   Film Noir:
-    plex_search:
-      all:
-        genre: Film-Noir
+    radarr_taglist: KAI-film-noir
         
   # === KOMETA-AI ===
   # enabled: false
@@ -36,9 +34,7 @@ class TestKometaParser:
   # prompt: Identify sci-fi movies
   # === END KOMETA-AI ===
   Sci-Fi:
-    plex_search:
-      all:
-        genre: Sci-Fi
+    radarr_taglist: KAI-sci-fi
 """
         )
         
@@ -71,9 +67,7 @@ class TestKometaParser:
   #   - Femme fatale character often present
   # === END KOMETA-AI ===
   Film Noir:
-    plex_search:
-      all:
-        genre: Film-Noir
+    radarr_taglist: KAI-film-noir
 """
         )
         

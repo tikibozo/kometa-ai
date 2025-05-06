@@ -264,9 +264,7 @@ collections:
   # confidence_threshold: 0.7
   # === END KOMETA-AI ===
   Action Movies:
-    plex_search:
-      all:
-        genre: Action
+    radarr_taglist: KAI-action-movies
     
   # === KOMETA-AI ===
   # enabled: true
@@ -275,9 +273,7 @@ collections:
   # confidence_threshold: 0.8
   # === END KOMETA-AI ===
   Drama:
-    plex_search:
-      all:
-        genre: Drama
+    radarr_taglist: KAI-drama
     """
     
     with open(os.path.join(config_dir, "collections.yml"), "w") as f:

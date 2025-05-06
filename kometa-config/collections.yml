@@ -11,9 +11,7 @@ collections:
   #   - Femme fatale character often present
   # === END KOMETA-AI ===
   Film Noir:
-    plex_search:
-      all:
-        genre: Film-Noir
+    radarr_taglist: KAI-film-noir
 
   # === KOMETA-AI ===
   # enabled: true
@@ -27,6 +25,4 @@ collections:
   #   - Often includes twists or complications during the heist
   # === END KOMETA-AI ===
   Heist Movies:
-    plex_search:
-      all:
-        genre: Crime
+    radarr_taglist: KAI-heist-movies

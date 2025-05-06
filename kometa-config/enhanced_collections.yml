@@ -13,9 +13,7 @@ collections:
   #   - The heist/robbery is the PRIMARY focus of the film, not a side element
   # === END KOMETA-AI ===
   Heist Movies:
-    plex_search:
-      all:
-        genre: Heist
+    radarr_taglist: KAI-heist-movies
     summary: A collection of the best heist movies and capers
 
   # === KOMETA-AI ===
@@ -31,9 +29,7 @@ collections:
   #   - Genre is primarily science fiction, not just containing sci-fi elements
   # === END KOMETA-AI ===
   Science Fiction:
-    plex_search:
-      all:
-        genre: Sci-Fi
+    radarr_taglist: KAI-science-fiction
     summary: A collection of science fiction movies spanning all eras
 
   # === KOMETA-AI ===
@@ -50,7 +46,5 @@ collections:
   #   - Pessimistic tone and atmosphere
   # === END KOMETA-AI ===
   Film Noir:
-    plex_search:
-      all:
-        genre: Film-Noir
+    radarr_taglist: KAI-film-noir
     summary: Classic film noir movies from Hollywood's golden age

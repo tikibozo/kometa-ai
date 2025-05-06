@@ -12,9 +12,7 @@ collections:
   # confidence_threshold: 0.7
   # === END KOMETA-AI ===
   Christopher Nolan's Best:
-    plex_search:
-      all:
-        director: Christopher Nolan
+    radarr_taglist: KAI-christopher-nolans-best
 
   # === KOMETA-AI ===
   # enabled: true
@@ -33,10 +31,7 @@ collections:
   # confidence_threshold: 0.75
   # === END KOMETA-AI ===
   Hitchcockian Thrillers:
-    plex_search:
-      any:
-        director: Alfred Hitchcock
-        genre: Thriller
+    radarr_taglist: KAI-hitchcockian-thrillers
 
   # === KOMETA-AI ===
   # enabled: true
@@ -58,6 +53,4 @@ collections:
   # confidence_threshold: 0.8
   # === END KOMETA-AI ===
   Wes Anderson Collection:
-    plex_search:
-      all:
-        director: Wes Anderson
+    radarr_taglist: KAI-wes-anderson-collection

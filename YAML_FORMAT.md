@@ -19,9 +19,7 @@ Collections are defined in YAML files within the `kometa-config` directory. Each
 #   - Femme fatale character often present
 # === END KOMETA-AI ===
 Film Noir:
-  plex_search:
-    all:
-      genre: Film-Noir
+  radarr_taglist: KAI-film-noir
 ```
 
 ## Configuration Options

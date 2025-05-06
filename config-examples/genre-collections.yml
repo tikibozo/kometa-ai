@@ -11,11 +11,7 @@ collections:
   # confidence_threshold: 0.75
   # === END KOMETA-AI ===
   Sci-Fi Comedy:
-    plex_search:
-      all:
-        genre: Science Fiction
-      any:
-        genre: Comedy
+    radarr_taglist: KAI-sci-fi-comedy
 
   # === KOMETA-AI ===
   # enabled: true
@@ -30,9 +26,7 @@ collections:
   # confidence_threshold: 0.8
   # === END KOMETA-AI ===
   Psychological Horror:
-    plex_search:
-      all:
-        genre: Horror
+    radarr_taglist: KAI-psychological-horror
 
   # === KOMETA-AI ===
   # enabled: true
@@ -46,8 +40,4 @@ collections:
   # confidence_threshold: 0.7
   # === END KOMETA-AI ===
   Action Thrillers:
-    plex_search:
-      all:
-        genre: Action
-      any:
-        genre: Thriller
+    radarr_taglist: KAI-action-thrillers

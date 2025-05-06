@@ -17,9 +17,7 @@ collections:
   # confidence_threshold: 0.75
   # === END KOMETA-AI ===
   Coming of Age:
-    plex_search:
-      any:
-        genre: Drama
+    radarr_taglist: KAI-coming-of-age
 
   # === KOMETA-AI ===
   # enabled: true
@@ -40,11 +38,7 @@ collections:
   # confidence_threshold: 0.8
   # === END KOMETA-AI ===
   Dystopian Futures:
-    plex_search:
-      any:
-        genre: 
-          - Science Fiction
-          - Thriller
+    radarr_taglist: KAI-dystopian-futures
 
   # === KOMETA-AI ===
   # enabled: true
@@ -66,8 +60,4 @@ collections:
   # confidence_threshold: 0.8
   # === END KOMETA-AI ===
   Time Loops and Paradoxes:
-    plex_search:
-      any:
-        genre: 
-          - Science Fiction
-          - Fantasy
+    radarr_taglist: KAI-time-loops-and-paradoxes

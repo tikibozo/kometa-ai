@@ -16,9 +16,7 @@ collections:
   # confidence_threshold: 0.75
   # === END KOMETA-AI ===
   Defining 80s Movies:
-    plex_search:
-      all:
-        year: 1980-1989
+    radarr_taglist: KAI-defining-80s-movies
 
   # === KOMETA-AI ===
   # enabled: true
@@ -38,9 +36,7 @@ collections:
   # confidence_threshold: 0.8
   # === END KOMETA-AI ===
   Hollywood Golden Age:
-    plex_search:
-      all:
-        year: 1930-1959
+    radarr_taglist: KAI-hollywood-golden-age
 
   # === KOMETA-AI ===
   # enabled: true
@@ -60,6 +56,4 @@ collections:
   # confidence_threshold: 0.75
   # === END KOMETA-AI ===
   New Hollywood Cinema:
-    plex_search:
-      all:
-        year: 1967-1980
+    radarr_taglist: KAI-new-hollywood-cinema
