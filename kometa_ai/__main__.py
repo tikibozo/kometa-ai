@@ -18,50 +18,7 @@ from kometa_ai.radarr.client import RadarrClient
 from kometa_ai.claude.client import ClaudeClient
 from kometa_ai.claude.processor import MovieProcessor
 from kometa_ai.kometa.parser import KometaParser
-# Add type stubs for mypy to avoid import-not-found error
-import sys
-from typing import Dict, List, Any, Optional, Type, Protocol, cast
-
-# Define protocol class for type checking
-class IStateManager(Protocol):
-    def __init__(self, *args: Any, **kwargs: Any) -> None: ...
-    def load(self) -> None: ...
-    def save(self) -> None: ...
-    def log_change(self, *args: Any, **kwargs: Any) -> None: ...
-    def log_error(self, *args: Any, **kwargs: Any) -> None: ...
-    def get_changes(self) -> List[Dict[str, Any]]: ...
-    def get_errors(self) -> List[Dict[str, Any]]: ...
-    def reset(self) -> None: ...
-    def dump(self) -> str: ...
-
-# Import or define StateManager
-if not sys.modules.get('kometa_ai.state.manager'):
-    # Create a module object to avoid import errors
-    class _StateManager:
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            pass
-        def load(self) -> None:
-            pass
-        def save(self) -> None:
-            pass
-        def log_change(self, *args: Any, **kwargs: Any) -> None:
-            pass
-        def log_error(self, *args: Any, **kwargs: Any) -> None:
-            pass
-        def get_changes(self) -> List[Dict[str, Any]]:
-            return []
-        def get_errors(self) -> List[Dict[str, Any]]:
-            return []
-        def reset(self) -> None:
-            pass
-        def dump(self) -> str:
-            return "{}"
-    
-    # Use the mock class
-    StateManager: Type[IStateManager] = _StateManager
-else:
-    # Import the real class if available
-    from kometa_ai.state.manager import StateManager  # type: ignore
+from kometa_ai.state.manager import StateManager
 from kometa_ai.tag_manager import TagManager
 from kometa_ai.notification.email import EmailNotifier
 from kometa_ai.notification.formatter import NotificationFormatter
@@ -96,7 +53,7 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
         description="Kometa-AI: Claude integration for Radarr collections")
 
     parser.add_argument("--run-now", action="store_true",
-                        help="Run immediately instead of waiting for schedule")
+                        help="Run immediately for the first execution, then switch to scheduled mode")
     parser.add_argument("--dry-run", action="store_true",
                         help=("Perform all operations without making actual "
                               "changes"))
@@ -227,6 +184,7 @@ def process_collections(
     claude_client: ClaudeClient,
     state_manager: StateManager,
     collections: List[Any],
+    all_movies: Optional[List[Any]] = None,
     dry_run: bool = False,
     batch_size: Optional[int] = None,
     force_refresh: bool = False,
@@ -239,6 +197,7 @@ def process_collections(
         claude_client: Claude API client
         state_manager: State manager for persistence
         collections: List of collections to process
+        all_movies: Optional list of movies already fetched from Radarr
         dry_run: If True, don't apply changes
         batch_size: Override default batch size
         force_refresh: Force reprocessing of all movies
@@ -253,10 +212,14 @@ def process_collections(
     if enable_profiling:
         profiler.start()
 
-    # Fetch movies once to minimize API calls
-    logger.info("Fetching movies from Radarr")
-    all_movies = radarr_client.get_movies()
-    logger.info(f"Retrieved {len(all_movies)} movies from Radarr")
+    # Use provided movies or fetch them if not provided
+    if all_movies is None:
+        # Fetch movies once to minimize API calls
+        logger.info("Fetching movies from Radarr")
+        all_movies = radarr_client.get_movies()
+        logger.info(f"Retrieved {len(all_movies)} movies from Radarr")
+    else:
+        logger.info(f"Using {len(all_movies)} movies already fetched from Radarr")
 
     # Create tag manager
     tag_manager = TagManager(radarr_client)
@@ -472,6 +435,12 @@ def send_notifications(
 
     if sent:
         logger.info("Notification email sent successfully")
+        # Clear errors and changes after successful notification to prevent stale data in future notifications
+        state_manager.clear_errors()
+        state_manager.clear_changes()
+        # Save state after clearing
+        state_manager.save()
+        logger.info("Cleared error and change records from state after sending notification")
     else:
         logger.error("Failed to send notification email")
 
@@ -597,6 +566,11 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
 
         logger.info(
             f"Found {len(collections)} collections to process")
+           
+        # Fetch movies once to use for both regular processing and optimization
+        logger.info("Fetching movies from Radarr")
+        all_movies = radarr_client.get_movies()
+        logger.info(f"Retrieved {len(all_movies)} movies from Radarr")
 
         # Set up batch size optimization test if requested
         if args.optimize_batch_size:
@@ -607,6 +581,7 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
                 claude_client=claude_client,
                 state_manager=state_manager,
                 collections=collections,
+                all_movies=all_movies,  # Pass the already fetched movies
                 output_file=(
                     args.profile_output or "batch_size_optimization.json"
                 )
@@ -628,6 +603,9 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
                 return 0
 
         # Run the main pipeline
+        # Track if this is the first run (for run-now mode)
+        first_run = True
+        
         while not terminate_requested:
             run_start_time = datetime.now()
             formatted_start = run_start_time.strftime("%Y-%m-%d %H:%M:%S")
@@ -640,6 +618,7 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
                 claude_client=claude_client,
                 state_manager=state_manager,
                 collections=collections,
+                all_movies=all_movies,  # Pass the already fetched movies
                 dry_run=args.dry_run,
                 batch_size=args.batch_size,
                 force_refresh=args.force_refresh,
@@ -660,7 +639,11 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
 
             # Calculate next run time for notification
             notification_run_time: Optional[datetime] = None
-            if not args.run_now:
+            # If it's the first run with run-now and we want to continue, calculate the next scheduled time
+            if args.run_now and first_run:
+                notification_run_time = calculate_schedule()
+            # Otherwise use normal logic
+            elif not args.run_now:
                 notification_run_time = calculate_schedule()
 
             # Send notifications
@@ -670,11 +653,20 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
                 next_run_time=notification_run_time
             )
 
-            # Exit if run-now mode or termination requested
-            if args.run_now or terminate_requested:
-                logger.info(
-                    "Single run completed, exiting")
+            # Exit if termination requested, or if it's the first run in run-now mode
+            if terminate_requested:
+                logger.info("Termination requested, exiting")
                 break
+                
+            if args.run_now and first_run:
+                logger.info("Initial run-now execution completed. Switching to scheduled mode.")
+                # Reset first_run flag to continue with scheduled runs
+                first_run = False
+                # Calculate the next scheduled run time immediately
+                next_run_time = calculate_schedule()
+                formatted_next = next_run_time.strftime("%Y-%m-%d %H:%M:%S")
+                logger.info(f"Next scheduled run at {formatted_next}")
+                # No break here, continue to the sleep section
 
             # Sleep until next run
             next_run_time = calculate_schedule()
@@ -720,6 +712,7 @@ def run_batch_size_optimization(
     claude_client: ClaudeClient,
     state_manager: StateManager,
     collections: List[Any],
+    all_movies: Optional[List[Any]] = None,
     output_file: str = "batch_size_optimization.json"
 ) -> int:
     """Run batch size optimization test.
@@ -732,6 +725,7 @@ def run_batch_size_optimization(
         claude_client: Claude API client
         state_manager: State manager
         collections: List of collections to test
+        all_movies: Optional list of movies already fetched from Radarr
         output_file: File to save results
 
     Returns:
@@ -739,10 +733,14 @@ def run_batch_size_optimization(
     """
     logger = logging.getLogger(__name__)
 
-    # Fetch all movies once
-    logger.info("Fetching movies from Radarr for batch size testing")
-    all_movies = radarr_client.get_movies()
-    logger.info(f"Retrieved {len(all_movies)} movies")
+    # Use provided movies or fetch them if not provided
+    if all_movies is None:
+        # Fetch all movies once
+        logger.info("Fetching movies from Radarr for batch size testing")
+        all_movies = radarr_client.get_movies()
+        logger.info(f"Retrieved {len(all_movies)} movies")
+    else:
+        logger.info(f"Using {len(all_movies)} movies already fetched from Radarr for batch size testing")
 
     # Select a single collection for testing
     if not collections:

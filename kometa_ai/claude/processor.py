@@ -9,69 +9,8 @@ from kometa_ai.claude.client import ClaudeClient, DEFAULT_BATCH_SIZE
 from kometa_ai.claude.prompts import get_system_prompt, format_collection_prompt, format_movies_data
 from kometa_ai.radarr.models import Movie
 from kometa_ai.kometa.models import CollectionConfig
-# Add type stubs for mypy to avoid import-not-found error
-import sys
-from typing import Dict, List, Any, Optional, Type, Protocol
-
-# Define protocol classes for type checking
-class IStateManager(Protocol):
-    def __init__(self, *args: Any, **kwargs: Any) -> None: ...
-    def load(self) -> None: ...
-    def save(self) -> None: ...
-    def log_change(self, *args: Any, **kwargs: Any) -> None: ...
-    def log_error(self, *args: Any, **kwargs: Any) -> None: ...
-
-class IDecisionRecord(Protocol):
-    movie_id: int
-    collection_name: str
-    include: bool
-    confidence: float
-    metadata_hash: str
-    tag: str
-    timestamp: str
-    reasoning: Optional[str]
-
-# Import or define the necessary classes
-if not sys.modules.get('kometa_ai.state.manager'):
-    # Create a module object to avoid import errors
-    class _StateManager:
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            pass
-        def load(self) -> None:
-            pass
-        def save(self) -> None:
-            pass
-        def log_change(self, *args: Any, **kwargs: Any) -> None:
-            pass
-        def log_error(self, *args: Any, **kwargs: Any) -> None:
-            pass
-    
-    class _DecisionRecord:
-        def __init__(self, 
-                     movie_id: int = 0,
-                     collection_name: str = "",
-                     include: bool = False,
-                     confidence: float = 0.0,
-                     metadata_hash: str = "",
-                     tag: str = "",
-                     timestamp: str = "",
-                     reasoning: Optional[str] = None) -> None:
-            self.movie_id = movie_id
-            self.collection_name = collection_name
-            self.include = include
-            self.confidence = confidence
-            self.metadata_hash = metadata_hash
-            self.tag = tag
-            self.timestamp = timestamp
-            self.reasoning = reasoning
-    
-    # Use the mock classes
-    StateManager: Type[IStateManager] = _StateManager
-    DecisionRecord: Type[IDecisionRecord] = _DecisionRecord
-else:
-    # Import the real classes if available
-    from kometa_ai.state.manager import StateManager  # type: ignore
-    from kometa_ai.state.models import DecisionRecord  # type: ignore
+from kometa_ai.state.manager import StateManager
+from kometa_ai.state.models import DecisionRecord
 from kometa_ai.utils.profiling import profile_time, profile_memory
 from kometa_ai.utils.memory_optimization import optimize_movie_objects, process_in_chunks, clear_memory
 from kometa_ai.utils.error_handling import (
@@ -333,7 +272,13 @@ class MovieProcessor:
                 logger.error(f"Invalid response format: {response}")
                 raise ValueError("Invalid response format: missing 'decisions' key")
 
+            # Get initial decisions
             decisions = response['decisions']
+            
+            # Apply iterative refinement for borderline cases if enabled
+            if collection.use_iterative_refinement:
+                decisions = self._refine_borderline_cases(collection, decisions, batch_movies)
+                
             included_ids = []
             excluded_ids = []
             movie_map = {movie.id: movie for movie in batch_movies}
@@ -407,6 +352,183 @@ class MovieProcessor:
 
             # Re-raise to let retry decorator handle it
             raise
+
+    def _refine_borderline_cases(
+        self,
+        collection: CollectionConfig,
+        decisions: List[Dict[str, Any]],
+        batch_movies: List[Movie]
+    ) -> List[Dict[str, Any]]:
+        """Refine decisions for borderline cases with a second pass analysis.
+        
+        Args:
+            collection: Collection configuration
+            decisions: Initial decisions from Claude
+            batch_movies: Movies in the current batch
+            
+        Returns:
+            Refined decisions
+        """
+        # Identify borderline cases
+        borderline_cases = []
+        movie_map = {movie.id: movie for movie in batch_movies}
+        
+        for decision in decisions:
+            confidence = decision.get('confidence', 0.0)
+            # Check if confidence is near the threshold
+            if abs(confidence - collection.confidence_threshold) < collection.refinement_threshold:
+                movie_id = decision.get('movie_id')
+                if movie_id in movie_map:
+                    borderline_cases.append((decision, movie_map[movie_id]))
+        
+        # If no borderline cases, return original decisions
+        if not borderline_cases:
+            logger.info(f"No borderline cases found for collection '{collection.name}'")
+            return decisions
+            
+        logger.info(f"Found {len(borderline_cases)} borderline cases for collection '{collection.name}'")
+        
+        # Refine each borderline case
+        for original_decision, movie in borderline_cases:
+            try:
+                # Create a detailed analysis prompt for this specific movie
+                refinement_prompt = self._create_refinement_prompt(collection, movie)
+                
+                # Get detailed analysis from Claude
+                detailed_response, usage_stats = self.claude_client.analyze_movie(
+                    system_prompt=self._get_refinement_system_prompt(),
+                    user_prompt=refinement_prompt
+                )
+                
+                # Process the refined decision and update the original
+                self._process_refinement_response(
+                    detailed_response, original_decision, collection, movie
+                )
+                
+                # Log refinement results
+                logger.info(
+                    f"Refined decision for movie {movie.id} ({movie.title}): "
+                    f"Original confidence: {original_decision.get('confidence', 0.0):.2f}, "
+                    f"Refined confidence: {original_decision.get('confidence', 0.0):.2f}"
+                )
+                
+            except Exception as e:
+                logger.error(f"Error refining decision for movie {movie.id}: {e}")
+                # Keep the original decision if refinement fails
+        
+        return decisions
+
+    def _create_refinement_prompt(self, collection: CollectionConfig, movie: Movie) -> str:
+        """Create a detailed prompt for refining a borderline case.
+        
+        Args:
+            collection: Collection configuration
+            movie: The movie to analyze
+            
+        Returns:
+            Detailed refinement prompt
+        """
+        return f"""
+I need your help analyzing whether the movie "{movie.title}" ({movie.year}) should be included in the "{collection.name}" collection.
+
+MOVIE DETAILS:
+- Title: {movie.title}
+- Year: {movie.year}
+- Genres: {', '.join(movie.genres)}
+- Overview: {movie.overview or "Not available"}
+- Runtime: {movie.runtime or "Unknown"} minutes
+- Studio: {movie.studio or "Unknown"}
+
+COLLECTION CRITERIA:
+{collection.prompt}
+
+This is a borderline case that needs deeper analysis. Please use your knowledge of films to thoroughly analyze this movie beyond the basic information provided. Consider:
+
+1. The primary themes and focus of the movie
+2. The genre conventions the movie follows
+3. Whether the collection theme is central to the movie or just incidental
+4. Similar movies that are definitively in or out of this collection
+5. Critical reception and how the movie is categorized by experts
+
+Based on your analysis, provide a detailed evaluation with a final confidence score and a clear yes/no decision.
+"""
+
+    def _get_refinement_system_prompt(self) -> str:
+        """Get the system prompt for detailed movie analysis.
+        
+        Returns:
+            System prompt for refinement
+        """
+        return """
+You are a film expert providing detailed analysis of whether a specific movie belongs in a themed collection.
+
+For the movie and collection provided, conduct a thorough analysis using your knowledge of cinema.
+Go beyond the basic information provided to analyze the movie's themes, style, reception, and how it fits with the collection criteria.
+
+Return your analysis in this JSON format:
+{
+  "movie_title": "Title of the movie",
+  "collection_name": "Name of the collection",
+  "detailed_analysis": "Your in-depth analysis of why this movie does or doesn't belong",
+  "include": true/false,
+  "confidence": 0.95,
+  "reasoning": "Concise explanation of your final decision"
+}
+"""
+
+    def _process_refinement_response(
+        self, 
+        response: Dict[str, Any], 
+        original_decision: Dict[str, Any],
+        collection: CollectionConfig,
+        movie: Movie
+    ) -> None:
+        """Process the refinement response from Claude and update the original decision.
+        
+        Args:
+            response: Claude refinement response
+            original_decision: Original decision to update
+            collection: Collection configuration
+            movie: Movie being analyzed
+        """
+        # Update with refined information if available
+        if 'include' in response:
+            original_decision['include'] = response['include']
+        if 'confidence' in response:
+            original_decision['confidence'] = response['confidence']
+        if 'reasoning' in response:
+            original_decision['reasoning'] = response['reasoning']
+        
+        # Include the detailed analysis in the state but not in the decision
+        detailed_analysis = response.get('detailed_analysis', '')
+        if detailed_analysis:
+            # Try to store the detailed analysis in the state
+            # using the set_detailed_analysis method if available
+            try:
+                self.state_manager.set_detailed_analysis(
+                    movie_id=movie.id,
+                    collection_name=collection.name,
+                    analysis=detailed_analysis
+                )
+            except AttributeError:
+                # Fallback: Store the analysis in the decision data itself
+                # Get existing movie data
+                state = self.state_manager.state
+                decisions = state.setdefault('decisions', {})
+                movie_key = f"movie:{movie.id}"
+                
+                if movie_key not in decisions:
+                    decisions[movie_key] = {'collections': {}}
+                    
+                movie_decisions = decisions[movie_key]
+                collections = movie_decisions.setdefault('collections', {})
+                
+                # Get or create collection data
+                if collection.name not in collections:
+                    collections[collection.name] = {}
+                    
+                # Add detailed analysis
+                collections[collection.name]['detailed_analysis'] = detailed_analysis
 
     def get_collection_stats(self, collection_name: Optional[str] = None) -> Dict[str, Any]:
         """Get usage statistics for collections.

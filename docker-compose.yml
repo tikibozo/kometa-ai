@@ -20,6 +20,7 @@ services:
       - SMTP_PASSWORD=your_password
       - SMTP_USE_TLS=true
       - NOTIFICATION_RECIPIENTS=user@example.com
+      - NOTIFICATION_FROM=kometa-ai@example.com
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-m", "kometa_ai", "--health-check"]

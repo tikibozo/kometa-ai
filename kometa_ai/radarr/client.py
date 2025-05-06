@@ -166,7 +166,7 @@ class RadarrClient:
         Returns:
             List of movies
         """
-        logger.info("Fetching movies from Radarr")
+        logger.debug("Making API request to fetch movies from Radarr")
         response = self._make_request('GET', '/movie')
         movies_data = response.json()
 

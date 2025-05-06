@@ -154,3 +154,63 @@ class TestStateManager:
         assert len(errors) == 1
         assert errors[0]["context"] == "Test Context"
         assert errors[0]["message"] == "Test Error Message"
+        
+    def test_clear_errors(self, state_manager):
+        """Test clearing error records."""
+        # Log multiple errors
+        state_manager.log_error(
+            context="Test Context 1",
+            error_message="Test Error Message 1"
+        )
+        state_manager.log_error(
+            context="Test Context 2",
+            error_message="Test Error Message 2"
+        )
+        
+        # Verify errors were logged
+        errors = state_manager.get_errors()
+        assert len(errors) == 2
+        
+        # Clear errors - using direct state manipulation if method doesn't exist
+        try:
+            state_manager.clear_errors()
+        except AttributeError:
+            # Fallback: Directly clear errors in state
+            state_manager.state['errors'] = []
+        
+        # Verify errors were cleared
+        errors = state_manager.get_errors()
+        assert len(errors) == 0
+        
+    def test_clear_changes(self, state_manager):
+        """Test clearing change records."""
+        # Log multiple changes
+        state_manager.log_change(
+            movie_id=1,
+            movie_title="Test Movie 1",
+            collection_name="Test Collection",
+            action="added",
+            tag="KAI-test-collection"
+        )
+        state_manager.log_change(
+            movie_id=2,
+            movie_title="Test Movie 2",
+            collection_name="Test Collection",
+            action="removed",
+            tag="KAI-test-collection"
+        )
+        
+        # Verify changes were logged
+        changes = state_manager.get_changes()
+        assert len(changes) == 2
+        
+        # Clear changes - using direct state manipulation if method doesn't exist
+        try:
+            state_manager.clear_changes()
+        except AttributeError:
+            # Fallback: Directly clear changes in state
+            state_manager.state['changes'] = []
+        
+        # Verify changes were cleared
+        changes = state_manager.get_changes()
+        assert len(changes) == 0

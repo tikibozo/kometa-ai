@@ -1,0 +1,56 @@
+collections:
+  # === KOMETA-AI ===
+  # enabled: true
+  # use_iterative_refinement: true
+  # refinement_threshold: 0.15
+  # confidence_threshold: 0.7
+  # prompt: |
+  #   Identify heist movies based on these criteria:
+  #   - Central plot revolves around planning and executing a heist or robbery
+  #   - Features a team or individual assembling a plan to steal something valuable
+  #   - Includes sequences showing planning, preparation, and execution of the heist
+  #   - Often contains twists, double-crosses, or complications during the heist
+  #   - The heist/robbery is the PRIMARY focus of the film, not a side element
+  # === END KOMETA-AI ===
+  Heist Movies:
+    plex_search:
+      all:
+        genre: Heist
+    summary: A collection of the best heist movies and capers
+
+  # === KOMETA-AI ===
+  # enabled: true
+  # use_iterative_refinement: true
+  # confidence_threshold: 0.75
+  # prompt: |
+  #   Identify science fiction movies based on these criteria:
+  #   - Features speculative scientific or technological concepts as central to the plot
+  #   - Set in the future, alternative reality, or involves futuristic technology
+  #   - Explores impacts of scientific, social, or technological innovations
+  #   - Typically involves space travel, time travel, AI, robots, advanced technology, or otherworldly elements
+  #   - Genre is primarily science fiction, not just containing sci-fi elements
+  # === END KOMETA-AI ===
+  Science Fiction:
+    plex_search:
+      all:
+        genre: Sci-Fi
+    summary: A collection of science fiction movies spanning all eras
+
+  # === KOMETA-AI ===
+  # enabled: true
+  # confidence_threshold: 0.7
+  # priority: 2
+  # prompt: |
+  #   Identify film noir movies based on these criteria:
+  #   - Made primarily between 1940-1959
+  #   - Dark, cynical themes and moral ambiguity
+  #   - Visual style emphasizing shadows, unusual angles
+  #   - Crime or detective storylines
+  #   - Femme fatale character often present
+  #   - Pessimistic tone and atmosphere
+  # === END KOMETA-AI ===
+  Film Noir:
+    plex_search:
+      all:
+        genre: Film-Noir
+    summary: Classic film noir movies from Hollywood's golden age

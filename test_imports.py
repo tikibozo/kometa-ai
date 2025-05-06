@@ -268,13 +268,13 @@ try:
     from kometa_ai.__main__ import StateManager as MainStateManager
     logger.info(f"StateManager from __main__: {MainStateManager}")
     
-    # Check if it's the mock or real version
-    is_mock = not hasattr(sys.modules.get('kometa_ai.state.manager', {}), 'StateManager')
-    logger.info(f"Is mock StateManager: {is_mock}")
+    # Check module import path
+    state_manager_module = sys.modules.get('kometa_ai.state.manager')
+    logger.info(f"State manager module: {state_manager_module}")
     
     test_summary["mocked_module_check"]["main_state_manager"] = {
         "success": True,
-        "is_mock": is_mock,
+        "module_path": str(state_manager_module),
         "details": str(MainStateManager)
     }
 except ImportError as e:

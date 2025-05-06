@@ -75,6 +75,7 @@ Kometa-AI can be installed using Docker or directly from source. The recommended
          - SMTP_PASSWORD=your_password
          - SMTP_USE_TLS=true
          - NOTIFICATION_RECIPIENTS=user@example.com
+         - NOTIFICATION_FROM=kometa-ai@example.com
        restart: unless-stopped
        healthcheck:
          test: ["CMD", "python", "-m", "kometa_ai", "--health-check"]
@@ -110,6 +111,13 @@ docker run -d \
   -e SCHEDULE_INTERVAL=1d \
   -e SCHEDULE_START_TIME=03:00 \
   -e TZ=America/New_York \
+  -e SMTP_SERVER=smtp.example.com \
+  -e SMTP_PORT=587 \
+  -e SMTP_USERNAME=your_username \
+  -e SMTP_PASSWORD=your_password \
+  -e SMTP_USE_TLS=true \
+  -e NOTIFICATION_RECIPIENTS=user@example.com \
+  -e NOTIFICATION_FROM=kometa-ai@example.com \
   -v /path/to/kometa-config:/app/kometa-config \
   -v /path/to/state:/app/state \
   -v /path/to/logs:/app/logs \

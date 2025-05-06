@@ -222,7 +222,9 @@ class KometaParser:
                 skip_patterns = [
                     r'^confidence_threshold:\s',
                     r'^priority:\s',
-                    r'^enabled:\s'
+                    r'^enabled:\s',
+                    r'^use_iterative_refinement:\s',
+                    r'^refinement_threshold:\s'
                 ]
 
                 should_skip = False
@@ -261,6 +263,20 @@ class KometaParser:
                 config['priority'] = priority_value  # type: ignore
             except ValueError:
                 config['priority'] = 0  # type: ignore
+                
+        # New options for iterative refinement
+        if 'use_iterative_refinement' in config:
+            # Save to a temp variable to avoid type error
+            refinement_value = str(config['use_iterative_refinement']).lower() in ('true', 'yes', '1')
+            config['use_iterative_refinement'] = refinement_value  # type: ignore
+            
+        if 'refinement_threshold' in config:
+            try:
+                # Save to a temp variable to avoid type error
+                threshold_value = float(config['refinement_threshold'])
+                config['refinement_threshold'] = threshold_value  # type: ignore
+            except ValueError:
+                config['refinement_threshold'] = 0.15  # type: ignore
 
         return config
 

@@ -31,8 +31,16 @@ When evaluating movies:
 - Do not artificially limit the number of movies in a collection
 - Include a movie if it fits the criteria, regardless of how many you've already included
 - Exclude a movie if it doesn't fit the criteria, even if the collection would be empty
-- For movies with little information, base your decision on what is available
-- For borderline cases, explain your reasoning briefly
+- For movies with little information, use your knowledge about films to supplement the data
+- Evaluate the movie's actual content and themes, not just what's mentioned in the overview
+- Be cautious about superficial similarities and lookout for mismatches between overview and actual film content
+- Be discriminating: a movie containing elements of a genre doesn't necessarily mean it belongs in that collection
+- Consider the movie's primary themes and genres, not incidental elements
+
+IMPORTANT: For collections based on themes or genres, focus on whether the movie is primarily about that theme/genre, not whether it contains elements of it. For example:
+- A movie with one heist scene is not necessarily a "Heist Movie"
+- A movie set partly in space is not necessarily a "Space Movie" 
+- A movie with some comedy is not necessarily a "Comedy Movie"
 
 Your response must follow this exact JSON format:
 {
@@ -92,6 +100,13 @@ COLLECTION DEFINITION AND CRITERIA:
 For each movie in the provided list, evaluate whether it belongs in the {collection.name} collection based on these criteria. Provide your decision and a confidence level (0.0-1.0) for each movie.
 
 The minimum confidence threshold for inclusion is {collection.confidence_threshold}. For movies with confidence below this threshold, they will not be included in the collection, so be careful not to underestimate your confidence if you believe a movie should be included.
+
+IMPORTANT CONSIDERATIONS FOR THIS COLLECTION:
+- You should only include movies that strongly match the collection's theme/genre
+- A movie that contains minor elements or scenes related to the collection theme should NOT be included
+- Focus on the movie's primary themes and content, not secondary elements
+- When evaluating movies, use your knowledge of cinema to supplement the data provided
+- Consider whether a typical viewer would categorize this movie primarily as a {collection.name.rstrip('s')} film
 
 Return your evaluation in the required JSON format ONLY, with no additional text or explanations outside the JSON structure.
 """

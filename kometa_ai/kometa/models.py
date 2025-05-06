@@ -14,6 +14,8 @@ class CollectionConfig:
     priority: int = 0
     exclude_tags: List[str] = field(default_factory=list)
     include_tags: List[str] = field(default_factory=list)
+    use_iterative_refinement: bool = False
+    refinement_threshold: float = 0.15  # Confidence margin for triggering refinement
 
     @property
     def tag(self) -> str:
@@ -45,7 +47,9 @@ class CollectionConfig:
             confidence_threshold=float(data.get('confidence_threshold', 0.7)),
             priority=int(data.get('priority', 0)),
             exclude_tags=data.get('exclude_tags', []),
-            include_tags=data.get('include_tags', [])
+            include_tags=data.get('include_tags', []),
+            use_iterative_refinement=data.get('use_iterative_refinement', False),
+            refinement_threshold=float(data.get('refinement_threshold', 0.15))
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -62,5 +66,7 @@ class CollectionConfig:
             'confidence_threshold': self.confidence_threshold,
             'priority': self.priority,
             'exclude_tags': self.exclude_tags,
-            'include_tags': self.include_tags
+            'include_tags': self.include_tags,
+            'use_iterative_refinement': self.use_iterative_refinement,
+            'refinement_threshold': self.refinement_threshold
         }

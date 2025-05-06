@@ -231,6 +231,107 @@ class ClaudeClient:
         # If we've exhausted retries
         raise Exception(f"Failed to classify movies after {MAX_RETRIES} retries")
 
+    def analyze_movie(
+        self,
+        system_prompt: str,
+        user_prompt: str
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """Analyze a single movie in detail.
+        
+        Args:
+            system_prompt: System prompt for the analysis
+            user_prompt: User prompt with movie details
+            
+        Returns:
+            Tuple of (analysis response, usage stats)
+        """
+        try:
+            # Create message context
+            messages = [
+                {
+                    "role": "system",
+                    "content": system_prompt
+                },
+                {
+                    "role": "user",
+                    "content": user_prompt
+                }
+            ]
+            
+            # Log full prompts if in debug mode
+            if self.debug_mode:
+                logger.debug(f"System prompt: {system_prompt}")
+                logger.debug(f"User prompt: {user_prompt}")
+            
+            # Make API request
+            response = self.client.messages.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=2000,  # Adjust as needed
+                temperature=0.1   # Lower temperature for more consistent results
+            )
+            
+            # Track usage
+            self._track_usage(response)
+            
+            # Extract response content
+            if not response.content or not hasattr(response.content[0], "text"):
+                raise ValueError("Claude API returned empty or invalid response")
+                
+            content = response.content[0].text
+            
+            # Log full response if in debug mode
+            if self.debug_mode:
+                logger.debug(f"Claude response: {content}")
+            
+            # Parse JSON from response
+            try:
+                analysis = self._parse_json_response(content)
+            except (ValueError, json.JSONDecodeError) as e:
+                logger.error(f"Failed to parse analysis response: {e}")
+                logger.error(f"Response content: {content[:500]}...")
+                
+                # Create a basic structure with error info
+                analysis = {
+                    "error": "Failed to parse response JSON",
+                    "include": False,
+                    "confidence": 0.0,
+                    "reasoning": f"Error analyzing movie: {str(e)}"
+                }
+            
+            # Calculate usage statistics
+            usage_stats = {
+                "total_input_tokens": response.usage.input_tokens,
+                "total_output_tokens": response.usage.output_tokens,
+                "total_cost": self._calculate_cost(
+                    response.usage.input_tokens,
+                    response.usage.output_tokens
+                ),
+                "requests": 1
+            }
+            
+            return analysis, usage_stats
+            
+        except Exception as e:
+            logger.error(f"Error analyzing movie: {e}")
+            raise
+            
+    def _calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
+        """Calculate the cost of a Claude API call.
+        
+        Args:
+            input_tokens: Number of input tokens
+            output_tokens: Number of output tokens
+            
+        Returns:
+            Cost in USD
+        """
+        # Approximate cost calculation (as of May 2024)
+        # Claude 3.5 Sonnet: $3/million input tokens, $15/million output tokens
+        input_cost = (input_tokens / 1_000_000) * 3.0
+        output_cost = (output_tokens / 1_000_000) * 15.0
+        return input_cost + output_cost
+
     def _parse_json_response(self, response_text: str) -> Dict[str, Any]:
         """Parse JSON from Claude's response with multiple fallback strategies.
 

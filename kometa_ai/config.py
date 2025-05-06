@@ -22,6 +22,7 @@ class Config:
         "SMTP_SERVER": None,
         "SMTP_PORT": "25",
         "NOTIFICATION_RECIPIENTS": None,
+        "NOTIFICATION_FROM": "kometa-ai@localhost",
         "SCHEDULE_INTERVAL": "1d",
         "SCHEDULE_START_TIME": "03:00",
         "TZ": "UTC",
