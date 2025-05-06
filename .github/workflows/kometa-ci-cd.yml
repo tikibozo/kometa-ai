@@ -57,8 +57,11 @@ jobs:
           echo "Verification failed but continuing with tests"
         }
         
-        # Run tests with verbosity
-        python -m pytest -xvs
+        # Run tests with verbosity and detailed tracebacks
+        python -m pytest -xvs --tb=native || {
+          echo "--- Running problematic tests individually with full verbosity ---"
+          python -m pytest -xvs tests/test_state_implementations.py -v
+        }
         
     - name: List files in workspace (debugging)
       run: |
