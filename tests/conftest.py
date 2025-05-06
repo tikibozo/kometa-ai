@@ -130,6 +130,28 @@ class MockStateManager:
         """Dump state as formatted JSON string."""
         return "{}"
         
+    def validate_state(self):
+        """Validate the state structure for consistency."""
+        errors = []
+        
+        # Check required top-level keys
+        required_keys = {'version', 'state_format_version', 'decisions', 'changes', 'errors'}
+        missing_keys = required_keys - set(self.state.keys())
+        if missing_keys:
+            errors.append(f"Missing required keys: {', '.join(missing_keys)}")
+            
+        # Basic type checks
+        if not isinstance(self.state.get('decisions', {}), dict):
+            errors.append("'decisions' is not a dictionary")
+            
+        if not isinstance(self.state.get('changes', []), list):
+            errors.append("'changes' is not a list")
+            
+        if not isinstance(self.state.get('errors', []), list):
+            errors.append("'errors' is not a list")
+            
+        return errors
+        
     def set_detailed_analysis(self, movie_id, collection_name, analysis):
         """Set detailed analysis for a movie/collection pair."""
         decisions = self.state.setdefault('decisions', {})
