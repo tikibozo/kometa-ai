@@ -434,6 +434,40 @@ class StateManager:
             Formatted JSON
         """
         return json.dumps(self.state, indent=2)
+        
+    def validate_state(self) -> List[str]:
+        """Validate the state structure for consistency.
+        
+        Checks that the state dictionary has the expected keys and structure.
+        
+        Returns:
+            List of validation error messages, empty if valid
+        """
+        errors = []
+        
+        # Check required top-level keys
+        required_keys = {'version', 'state_format_version', 'last_update', 'decisions', 'changes', 'errors'}
+        missing_keys = required_keys - set(self.state.keys())
+        if missing_keys:
+            errors.append(f"Missing required keys: {', '.join(missing_keys)}")
+            
+        # Check state_format_version
+        if self.state.get('state_format_version') != self.STATE_VERSION:
+            errors.append(f"Invalid state_format_version: {self.state.get('state_format_version')} != {self.STATE_VERSION}")
+            
+        # Check that decisions is a dictionary
+        if not isinstance(self.state.get('decisions', {}), dict):
+            errors.append("'decisions' is not a dictionary")
+            
+        # Check that changes is a list
+        if not isinstance(self.state.get('changes', []), list):
+            errors.append("'changes' is not a list")
+            
+        # Check that errors is a list
+        if not isinstance(self.state.get('errors', []), list):
+            errors.append("'errors' is not a list")
+            
+        return errors
 EOF
 
 # Verify files exist

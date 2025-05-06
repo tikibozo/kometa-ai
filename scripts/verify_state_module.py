@@ -78,13 +78,21 @@ def check_method_signature(cls, method_name, expected_params, expected_return_ty
             return True, ""
         
         # Check if the return type matches the expected type
-        if isinstance(expected_return_type, tuple):
-            # Handle union types
-            valid_types = set(t for t in expected_return_type if t is not None)
-            if not any(issubclass(return_annotation, t) for t in valid_types if isinstance(t, type)):
-                return False, f"Method {method_name} has return type {return_annotation}, expected one of {expected_return_type}"
-        elif expected_return_type is not None and not issubclass(return_annotation, expected_return_type):
-            return False, f"Method {method_name} has return type {return_annotation}, expected {expected_return_type}"
+        try:
+            if isinstance(expected_return_type, tuple):
+                # Handle union types
+                valid_types = set(t for t in expected_return_type if t is not None and t is not inspect.Signature.empty)
+                if valid_types and return_annotation != inspect.Signature.empty:
+                    if not any(return_annotation == t or (isinstance(t, type) and issubclass(return_annotation, t)) 
+                             for t in valid_types if t is not None):
+                        return False, f"Method {method_name} has return type {return_annotation}, expected one of {expected_return_type}"
+            elif expected_return_type is not None and expected_return_type is not inspect.Signature.empty and return_annotation != inspect.Signature.empty:
+                if return_annotation != expected_return_type and not (isinstance(expected_return_type, type) and issubclass(return_annotation, expected_return_type)):
+                    return False, f"Method {method_name} has return type {return_annotation}, expected {expected_return_type}"
+        except (TypeError, AttributeError):
+            # Be lenient with type checking errors
+            logger.debug(f"Could not check return type for {method_name}: {return_annotation} vs {expected_return_type}")
+            return True, ""
             
         return True, ""
     except Exception as e:

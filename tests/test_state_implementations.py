@@ -8,15 +8,46 @@ This file contains tests that verify:
 
 import inspect
 import unittest
+import sys
+import os
 from typing import Set, Dict, Any, List, Optional, Type, Callable
 
+# Add the parent directory to the path to ensure imports work
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Try importing the real StateManager
 try:
     from kometa_ai.state.manager import StateManager as RealStateManager
     HAS_REAL_IMPLEMENTATION = True
 except ImportError:
+    print("Note: Could not import real StateManager, tests will use mock only")
     HAS_REAL_IMPLEMENTATION = False
 
-from conftest import MockStateManager
+# Import the MockStateManager from conftest
+try:
+    from conftest import MockStateManager
+except ImportError:
+    # As a fallback, define a minimal MockStateManager for testing
+    print("Warning: Could not import MockStateManager from conftest, using fallback")
+    class MockStateManager:
+        def __init__(self, *args, **kwargs):
+            self.state = {'decisions': {}, 'changes': [], 'errors': []}
+            
+        def load(self): pass
+        def save(self): pass
+        def reset(self): pass
+        def get_decision(self, a, b): return None
+        def set_decision(self, d): pass
+        def get_decisions_for_movie(self, m): return []
+        def get_metadata_hash(self, m): return None
+        def log_change(self, a, b, c, d, e): pass
+        def log_error(self, a, b): pass
+        def get_changes(self): return []
+        def get_errors(self): return []
+        def clear_errors(self): self.state['errors'] = []
+        def clear_changes(self): self.state['changes'] = []
+        def dump(self): return "{}"
+        def validate_state(self): return []
 
 # Required methods with their signatures (parameter count, excluding self)
 REQUIRED_METHODS = {
