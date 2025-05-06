@@ -36,8 +36,6 @@ venv.bak/
 logs/
 *.log
 
-# State files
-state/
 
 # Test data
 test_data/
