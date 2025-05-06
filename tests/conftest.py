@@ -37,16 +37,62 @@ except ImportError as e:
 
 # Mock the StateManager and DecisionRecord classes if they can't be imported
 class MockStateManager:
+    """Mock implementation of StateManager for testing.
+    
+    This implementation includes all methods required by the real StateManager,
+    including those used in CI testing.
+    """
+    # Current state format version
+    STATE_VERSION = 1
+    
     def __init__(self, *args, **kwargs):
-        self.state = {'decisions': {}, 'changes': [], 'errors': []}
+        """Initialize a mock state manager."""
+        self.state = {
+            'version': '0.1.0',
+            'state_format_version': self.STATE_VERSION,
+            'last_update': None,
+            'decisions': {},
+            'changes': [],
+            'errors': []
+        }
     
     def load(self):
+        """Load state from disk (mock)."""
         pass
     
     def save(self):
+        """Save state to disk (mock)."""
         pass
     
+    def reset(self):
+        """Reset state to empty."""
+        self.state = {
+            'version': '0.1.0',
+            'state_format_version': self.STATE_VERSION,
+            'last_update': None,
+            'decisions': {},
+            'changes': [],
+            'errors': []
+        }
+        
+    def get_decision(self, movie_id, collection_name):
+        """Get a decision for a movie/collection pair."""
+        return None
+        
+    def set_decision(self, decision):
+        """Set a decision for a movie/collection pair."""
+        pass
+        
+    def get_decisions_for_movie(self, movie_id):
+        """Get all decisions for a movie."""
+        return []
+        
+    def get_metadata_hash(self, movie_id):
+        """Get the stored metadata hash for a movie."""
+        return None
+    
     def log_change(self, *args, **kwargs):
+        """Log a tag change."""
         change = {
             'movie_id': kwargs.get('movie_id', 0),
             'title': kwargs.get('movie_title', ''),
@@ -57,6 +103,7 @@ class MockStateManager:
         self.state.setdefault('changes', []).append(change)
     
     def log_error(self, *args, **kwargs):
+        """Log an error."""
         error = {
             'context': kwargs.get('context', ''),
             'message': kwargs.get('error_message', '')
@@ -64,18 +111,27 @@ class MockStateManager:
         self.state.setdefault('errors', []).append(error)
         
     def get_changes(self):
+        """Get recent changes."""
         return self.state.get('changes', [])
         
     def get_errors(self):
+        """Get recent errors."""
         return self.state.get('errors', [])
         
     def clear_errors(self):
+        """Clear all error records."""
         self.state['errors'] = []
         
     def clear_changes(self):
+        """Clear all change records."""
         self.state['changes'] = []
         
+    def dump(self):
+        """Dump state as formatted JSON string."""
+        return "{}"
+        
     def set_detailed_analysis(self, movie_id, collection_name, analysis):
+        """Set detailed analysis for a movie/collection pair."""
         decisions = self.state.setdefault('decisions', {})
         movie_key = f"movie:{movie_id}"
         
@@ -91,6 +147,7 @@ class MockStateManager:
         collections[collection_name]['detailed_analysis'] = analysis
         
     def get_detailed_analysis(self, movie_id, collection_name):
+        """Get detailed analysis for a movie/collection pair."""
         decisions = self.state.get('decisions', {})
         movie_key = f"movie:{movie_id}"
         

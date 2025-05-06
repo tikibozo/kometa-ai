@@ -44,8 +44,9 @@ jobs:
         CI: "true"
         PYTHONPATH: "."
       run: |
-        # Check that state module is importable
+        # Check that state module is importable and has all required methods
         python -c "from kometa_ai.state import StateManager, DecisionRecord; print(f'State module is importable! StateManager: {StateManager}')"
+        python scripts/verify_state_module.py
         
         # Run tests with verbosity
         python -m pytest -xvs
