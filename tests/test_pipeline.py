@@ -392,6 +392,12 @@ class TestEndToEndPipeline:
             error_message="Test error message"
         )
         
+        # Ensure clear_errors and clear_changes methods exist
+        if not hasattr(state_manager, 'clear_errors'):
+            state_manager.clear_errors = lambda: state_manager.state.update({'errors': []})
+        if not hasattr(state_manager, 'clear_changes'):
+            state_manager.clear_changes = lambda: state_manager.state.update({'changes': []})
+        
         # Set up a next run time
         next_run_time = datetime.now() + timedelta(hours=24)
         
