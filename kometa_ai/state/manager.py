@@ -313,6 +313,14 @@ class StateManager:
             List of error records
         """
         return self.state.get('errors', [])
+        
+    def clear_errors(self) -> None:
+        """Clear all error records from the state."""
+        self.state['errors'] = []
+        
+    def clear_changes(self) -> None:
+        """Clear all change records from the state."""
+        self.state['changes'] = []
 
     def dump(self) -> str:
         """Dump state as formatted JSON string.

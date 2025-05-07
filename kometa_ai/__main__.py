@@ -636,6 +636,16 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
                     logger.info(f"Profiling results saved to {profile_output}")
                 except Exception as e:
                     logger.error(f"Error saving profiling results: {e}")
+                    
+            # Log the total cost spent on Claude API
+            usage_stats = claude_client.get_usage_stats()
+            total_cost = usage_stats.get('total_cost', 0.0)
+            total_input_tokens = usage_stats.get('total_input_tokens', 0)
+            total_output_tokens = usage_stats.get('total_output_tokens', 0)
+            total_requests = usage_stats.get('requests', 0)
+            
+            logger.info(f"Claude API usage summary: ${total_cost:.4f} spent on {total_requests} requests "
+                       f"({total_input_tokens:,} input tokens, {total_output_tokens:,} output tokens)")
 
             # Calculate next run time for notification
             notification_run_time: Optional[datetime] = None
