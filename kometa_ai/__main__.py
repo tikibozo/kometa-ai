@@ -886,6 +886,43 @@ If you're seeing this email, your email configuration is working correctly!
         return False
 
 
+def ensure_required_directories_exist() -> bool:
+    """
+    Create required directories.
+    This ensures the application can run without manual directory creation.
+    
+    Returns:
+        bool: True if directories were created successfully, False otherwise
+    """
+    required_dirs = [
+        os.path.join(os.getcwd(), "logs"),
+        os.path.join(os.getcwd(), "state"),
+        os.path.join(os.getcwd(), "state", "backups"),
+    ]
+    
+    for directory in required_dirs:
+        try:
+            os.makedirs(directory, exist_ok=True)
+        except (PermissionError, OSError) as e:
+            # At this point, we can't use logging yet, so print the error
+            print(f"ERROR: Failed to create directory {directory}: {str(e)}")
+            print("Kometa-AI requires write access to logs and state directories.")
+            print("Please ensure these directories exist and are writable.")
+            return False
+            
+        # Check if the directory is writable by creating a test file
+        test_file = os.path.join(directory, ".write_test")
+        try:
+            with open(test_file, 'w') as f:
+                f.write("test")
+            os.remove(test_file)
+        except (PermissionError, OSError) as e:
+            print(f"ERROR: Directory {directory} is not writable: {str(e)}")
+            print("Kometa-AI requires write access to logs and state directories.")
+            return False
+    
+    return True
+
 def main(args: Optional[List[str]] = None) -> int:
     # Parse arguments
     parsed_args = parse_args(args)
@@ -897,7 +934,12 @@ def main(args: Optional[List[str]] = None) -> int:
     if parsed_args.version:
         print(f"Kometa-AI version {__version__}")
         return 0
-
+        
+    # Ensure directories exist before setting up logging
+    if not ensure_required_directories_exist():
+        print("ERROR: Failed to create or access required directories. Exiting.")
+        return 1
+    
     # Setup logging
     debug_mode = (parsed_args.dump_config or parsed_args.dump_state or
                   Config.get_bool("DEBUG_LOGGING", False))
