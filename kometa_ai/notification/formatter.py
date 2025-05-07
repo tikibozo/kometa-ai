@@ -156,7 +156,8 @@ class NotificationFormatter:
         errors: List[Dict[str, Any]],
         next_run_time: Optional[datetime] = None,
         collection_stats: Optional[Dict[str, Dict[str, Any]]] = None,
-        version: str = "unknown"
+        version: str = "unknown",
+        changes_metadata: Optional[Dict[str, Any]] = None
     ) -> str:
         """Format a summary email with changes, errors, and processing statistics.
 
@@ -166,6 +167,7 @@ class NotificationFormatter:
             next_run_time: Next scheduled run time
             collection_stats: Processing statistics from the movie processor
             version: Application version
+            changes_metadata: Metadata about changes, including total count if truncated
 
         Returns:
             Formatted email body in Markdown format
@@ -175,10 +177,19 @@ class NotificationFormatter:
         # Summary section
         has_changes = len(changes) > 0
         has_errors = len(errors) > 0
+        
+        # Check if changes were truncated
+        changes_truncated = changes_metadata and changes_metadata.get('truncated', False)
+        total_changes = changes_metadata.get('total_count', len(changes)) if changes_metadata else len(changes)
 
         lines.append("## Overview")
         lines.append("")
-        lines.append(f"- Total changes: {len(changes)}")
+        
+        if changes_truncated:
+            lines.append(f"- Total changes: {total_changes} (showing the most recent {len(changes)})")
+        else:
+            lines.append(f"- Total changes: {total_changes}")
+            
         lines.append(f"- Errors: {len(errors)}")
 
         if next_run_time:

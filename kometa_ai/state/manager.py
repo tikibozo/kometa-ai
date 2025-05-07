@@ -273,9 +273,14 @@ class StateManager:
 
         changes.append(change)
 
-        # Keep only the last 100 changes
-        if len(changes) > 100:
-            self.state['changes'] = changes[-100:]
+        # Keep only the last 500 changes
+        if len(changes) > 500:
+            # Store the total count before truncating
+            self.state.setdefault('changes_metadata', {})
+            self.state['changes_metadata']['total_count'] = len(changes)
+            self.state['changes_metadata']['truncated'] = True
+            # Keep the 500 most recent changes
+            self.state['changes'] = changes[-500:]
 
     def log_error(self, context: str, error_message: str) -> None:
         """Log an error.
@@ -305,6 +310,14 @@ class StateManager:
             List of change records
         """
         return self.state.get('changes', [])
+        
+    def get_changes_metadata(self) -> Dict[str, Any]:
+        """Get metadata about changes, including total count if truncated.
+        
+        Returns:
+            Dictionary with metadata about changes
+        """
+        return self.state.get('changes_metadata', {'truncated': False, 'total_count': len(self.get_changes())})
 
     def get_errors(self) -> List[Dict[str, Any]]:
         """Get recent errors.
@@ -319,8 +332,9 @@ class StateManager:
         self.state['errors'] = []
         
     def clear_changes(self) -> None:
-        """Clear all change records from the state."""
+        """Clear all change records and their metadata from the state."""
         self.state['changes'] = []
+        self.state['changes_metadata'] = {'truncated': False, 'total_count': 0}
 
     def dump(self) -> str:
         """Dump state as formatted JSON string.

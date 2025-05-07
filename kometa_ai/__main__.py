@@ -413,9 +413,13 @@ def send_notifications(
     logger.info(
         f"Found {len(recent_changes)} changes and {len(recent_errors)} errors to report")
 
+    # Get changes metadata
+    changes_metadata = state_manager.get_changes_metadata()
+    total_changes = changes_metadata.get('total_count', len(recent_changes))
+    
     # Format email content
     subject = (
-        f"Kometa-AI Processing Report: {len(recent_changes)} changes, "
+        f"Kometa-AI Processing Report: {total_changes} changes, "
         f"{len(recent_errors)} errors"
     )
 
@@ -424,7 +428,8 @@ def send_notifications(
         errors=recent_errors,
         next_run_time=next_run_time,
         collection_stats=results.get("collection_stats", {}),
-        version=__version__
+        version=__version__,
+        changes_metadata=changes_metadata
     )
 
     # Send notification
