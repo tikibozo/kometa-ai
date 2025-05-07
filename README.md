@@ -106,6 +106,7 @@ services:
 - `RADARR_URL`: Base URL for Radarr instance
 - `RADARR_API_KEY`: API key for Radarr authentication
 - `CLAUDE_API_KEY`: API key for Claude AI
+- `CLAUDE_MODEL`: Optional override for Claude model (default: claude-3-7-sonnet-latest)
 - `DEBUG_LOGGING`: Boolean flag to enable detailed logging (default: false)
 - `SMTP_SERVER`: SMTP server address
 - `SMTP_PORT`: SMTP port (default: 25)

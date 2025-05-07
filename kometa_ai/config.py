@@ -18,6 +18,7 @@ class Config:
         "RADARR_URL": None,  # Required
         "RADARR_API_KEY": None,  # Required
         "CLAUDE_API_KEY": None,  # Required
+        "CLAUDE_MODEL": "claude-3-7-sonnet-latest",  # Optional: override default Claude model
         "DEBUG_LOGGING": "false",
         "SMTP_SERVER": None,
         "SMTP_PORT": "25",

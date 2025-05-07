@@ -11,6 +11,7 @@ from kometa_ai.radarr.models import Movie
 from kometa_ai.kometa.models import CollectionConfig
 from kometa_ai.state.manager import StateManager
 from kometa_ai.state.models import DecisionRecord
+from kometa_ai.config import Config
 from kometa_ai.utils.profiling import profile_time, profile_memory
 from kometa_ai.utils.memory_optimization import optimize_movie_objects, process_in_chunks, clear_memory
 from kometa_ai.utils.error_handling import (

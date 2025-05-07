@@ -545,8 +545,12 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
                 time.sleep(backoff)
 
         logger.info("Initializing Claude client...")
+        # Get optional model override from config
+        claude_model = Config.get("CLAUDE_MODEL")
         claude_client = ClaudeClient(
-            claude_api_key, debug_mode=Config.get_bool("DEBUG_LOGGING", False))
+            claude_api_key, 
+            debug_mode=Config.get_bool("DEBUG_LOGGING", False),
+            model=claude_model)
 
         # Parse Kometa configuration
         logger.info("Loading collection configurations...")

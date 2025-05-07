@@ -19,12 +19,13 @@ DEFAULT_BATCH_SIZE = 150
 class ClaudeClient:
     """Client for interacting with the Claude AI API."""
 
-    def __init__(self, api_key: str, debug_mode: bool = False):
+    def __init__(self, api_key: str, debug_mode: bool = False, model: str = None):
         """Initialize the Claude API client.
 
         Args:
             api_key: API key for authentication
             debug_mode: Whether to log full prompts and responses
+            model: Claude model to use (defaults to claude-3-5-sonnet-20240620 if None)
         """
         self.api_key = api_key
         self.debug_mode = debug_mode
@@ -36,7 +37,7 @@ class ClaudeClient:
             'requests': 0,
             'start_time': datetime.now(UTC).isoformat()
         }
-        self.model = "claude-3-5-sonnet-20240620"  # Default model
+        self.model = model if model else "claude-3-7-sonnet-latest"  # Default model
         logger.info(f"Initialized Claude client with model {self.model}")
 
     def test_connection(self) -> bool:
