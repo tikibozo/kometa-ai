@@ -26,8 +26,13 @@ LABEL maintainer="Kometa-AI Team" \
       version="1.0.0" \
       description="AI-powered movie collection manager for Radarr and Kometa"
 
-# Create non-root user
-RUN groupadd -r kometa && useradd -r -g kometa kometa
+# Install gosu for dropping privileges
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gosu \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user with default UID/GID of 1000
+RUN groupadd -g 1000 kometa && useradd -u 1000 -g kometa -d /app kometa
 
 # Set working directory
 WORKDIR /app
@@ -53,14 +58,18 @@ ENV TZ=UTC \
     SCHEDULE_START_TIME=03:00 \
     DEBUG_LOGGING=false \
     SMTP_PORT=25 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    # Default UID/GID - can be overridden at runtime
+    PUID=1000 \
+    PGID=1000
+
+# Copy entrypoint script
+COPY scripts/entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Healthcheck
 HEALTHCHECK --interval=5m --timeout=30s --start-period=1m --retries=3 \
   CMD python -m kometa_ai --health-check || exit 1
 
-# Switch to non-root user
-USER kometa
-
-# Entry point runs the main script
-ENTRYPOINT ["python", "-m", "kometa_ai"]
+# Entry point handles user setup and runs the main script
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh", "python", "-m", "kometa_ai"]

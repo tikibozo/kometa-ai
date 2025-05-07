@@ -62,6 +62,10 @@ Kometa-AI can be installed using Docker or directly from source. The recommended
          - ./state:/app/state
          - ./logs:/app/logs
        environment:
+         # User/Group ID configuration (match your host system ID)
+         - PUID=1000
+         - PGID=1000
+         # API keys and essential configuration
          - RADARR_URL=http://radarr:7878
          - RADARR_API_KEY=your_radarr_api_key
          - CLAUDE_API_KEY=your_claude_api_key
@@ -69,6 +73,7 @@ Kometa-AI can be installed using Docker or directly from source. The recommended
          - SCHEDULE_INTERVAL=1d
          - SCHEDULE_START_TIME=03:00
          - TZ=America/New_York
+         # Email notification configuration
          - SMTP_SERVER=smtp.example.com
          - SMTP_PORT=587
          - SMTP_USERNAME=your_username
@@ -106,12 +111,17 @@ Alternatively, you can use the Docker run command directly:
 ```bash
 docker run -d \
   --name=kometa-ai \
+  # User/Group ID configuration (match your host system ID)
+  -e PUID=1000 \
+  -e PGID=1000 \
+  # API keys and essential configuration
   -e RADARR_URL=http://radarr:7878 \
   -e RADARR_API_KEY=your_radarr_api_key \
   -e CLAUDE_API_KEY=your_claude_api_key \
   -e SCHEDULE_INTERVAL=1d \
   -e SCHEDULE_START_TIME=03:00 \
   -e TZ=America/New_York \
+  # Email notification configuration
   -e SMTP_SERVER=smtp.example.com \
   -e SMTP_PORT=587 \
   -e SMTP_USERNAME=your_username \
@@ -120,6 +130,7 @@ docker run -d \
   -e NOTIFICATION_RECIPIENTS=user@example.com \
   -e NOTIFICATION_FROM=kometa-ai@example.com \
   -e KOMETA_FIX_TAGS=false \
+  # Volume mappings
   -v /path/to/kometa-config:/app/kometa-config \
   -v /path/to/state:/app/state \
   -v /path/to/logs:/app/logs \
@@ -156,6 +167,8 @@ If you need to build the image yourself:
 | `SCHEDULE_INTERVAL` | Interval between runs (e.g., "1h", "1d", "1w", "1mo") | "1d" | No |
 | `SCHEDULE_START_TIME` | Start time in 24hr format (e.g., "03:00") | "03:00" | No |
 | `TZ` | Time zone for scheduling | UTC | No |
+| `PUID` | User ID to run the container as | 1000 | No |
+| `PGID` | Group ID to run the container as | 1000 | No |
 | `DEBUG_LOGGING` | Enable detailed logging | false | No |
 | `SMTP_SERVER` | SMTP server address | | No |
 | `SMTP_PORT` | SMTP server port | 25 | No |
@@ -238,6 +251,35 @@ chmod 777 kometa-ai/state kometa-ai/logs
 - The Docker image runs as a non-root user for improved security
 - Keep Docker and the Kometa-AI image updated regularly
 - Consider enabling Docker's security features like read-only filesystems for additional security
+
+### User Permissions
+
+Kometa-AI supports running as a specific user and group via the `PUID` and `PGID` environment variables:
+
+- `PUID`: The User ID to run as (Default: 1000)
+- `PGID`: The Group ID to run as (Default: 1000)
+
+Setting these to match your host system's user/group IDs ensures that any files created by the container will be owned by that user on the host system. This is important for avoiding permission issues when accessing files in mapped volumes.
+
+To find your user and group IDs on the host system:
+
+```bash
+# Find your user ID
+id -u
+
+# Find your group ID
+id -g
+```
+
+Then add these values to your docker-compose.yml file or Docker run command:
+
+```yaml
+environment:
+  - PUID=1000    # Replace with your user ID
+  - PGID=1000    # Replace with your group ID
+```
+
+This ensures that files created by the container in mounted volumes will be accessible to your user on the host system.
 
 ## Monitoring and Logging
 

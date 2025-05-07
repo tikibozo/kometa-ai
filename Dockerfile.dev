@@ -2,6 +2,14 @@ FROM python:3.11-slim-bullseye
 
 WORKDIR /app
 
+# Install development dependencies and gosu for permission handling
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gosu \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user with default UID/GID
+RUN groupadd -g 1000 kometa && useradd -u 1000 -g kometa -d /app kometa
+
 # Install development dependencies
 COPY requirements.txt requirements-dev.txt ./
 RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
@@ -19,10 +27,17 @@ ENV TZ=UTC \
     DEBUG_LOGGING=true \
     PYTHONASYNCIODEBUG=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    # Default UID/GID - can be overridden at runtime
+    PUID=1000 \
+    PGID=1000
 
 # Use watchdog for auto-reloading during development
 RUN pip install watchdog[watchmedo]
 
+# Copy entrypoint script
+COPY scripts/entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # Entry point with auto-reload (dev only)
-ENTRYPOINT ["watchmedo", "auto-restart", "--directory=./", "--pattern=*.py", "--recursive", "--", "python", "-m", "kometa_ai"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh", "watchmedo", "auto-restart", "--directory=./", "--pattern=*.py", "--recursive", "--", "python", "-m", "kometa_ai"]

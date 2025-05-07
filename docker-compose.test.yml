@@ -11,6 +11,9 @@ services:
       - /tmp/kometa_ai_test/state:/app/state
       - /tmp/kometa_ai_test/logs:/app/logs
     environment:
+      # User/Group ID configuration
+      - PUID=1000    # Set this to your host user ID
+      - PGID=1000    # Set this to your host group ID
       - RADARR_URL=http://mock-radarr:1080
       - RADARR_API_KEY=test_api_key
       - CLAUDE_API_KEY=test_api_key

@@ -9,6 +9,9 @@ services:
       - ./test_data/state:/app/state
       - ./logs:/app/logs
     environment:
+      # User/Group ID configuration
+      - PUID=1000    # Set this to your host user ID
+      - PGID=1000    # Set this to your host group ID
       - RADARR_URL=http://mock-radarr:7878
       - RADARR_API_KEY=dev_api_key
       - CLAUDE_API_KEY=dev_api_key
