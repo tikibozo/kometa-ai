@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/tikibozo/kometa-ai/compare/v0.2.4...v0.2.5) (2026-07-06)
+
+
+### Documentation
+
+* document CLAUDE_CODE_OAUTH_TOKEN auth for the cli backend ([5546d25](https://github.com/tikibozo/kometa-ai/commit/5546d25f322dccf9d73aa048ecf93b79af5aa0a9))
+
 ## [0.2.4](https://github.com/tikibozo/kometa-ai/compare/v0.2.3...v0.2.4) (2026-07-06)
 
 
