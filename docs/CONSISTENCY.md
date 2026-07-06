@@ -62,8 +62,8 @@ rating wobble doesn't re-trigger evaluations.
 **Upgrade note:** the enrichment fields change every movie's metadata hash, so
 the first run after upgrading re-evaluates the whole library once (anchored +
 hysteresis-protected). On the API backend that is a one-time cost of roughly
-$1.50–2 per 1,000 movies per collection with claude-sonnet-5; on the CLI
-backend it is subscription time only.
+$4 per 1,000 movies per collection with claude-sonnet-5 (keywords roughly
+double the prompt size); on the CLI backend it is subscription time only.
 
 ## Measuring
 
@@ -78,8 +78,12 @@ Benchmarks on a real 4,590-movie Radarr library (claude-sonnet-5, CLI backend):
 |---|---|---|---|
 | Heist Movies | 60 | 0/60 (0.0%) | 2 re-evaluated, 0 changes |
 | Dark Comedies (deliberately fuzzy) | 80 | 1/80 (1.2%) | 10 re-evaluated, 0 changes |
+| Dark Comedies (with keyword enrichment) | 80 | 1/80 (1.2%) | 0 re-evaluated, 0 changes |
 
-The single raw flip was Sweeney Todd (horror-musical-comedy — genuinely
-ambiguous); with priors in state, anchoring + hysteresis held it stable.
+The single raw flip in both Dark Comedies runs was Sweeney Todd
+(horror-musical-comedy — genuinely ambiguous); with priors in state,
+anchoring + hysteresis holds it stable. With enrichment, confidences became
+decisive enough that the stability pass had nothing left in the
+near-threshold band at all.
 
 Target: <2% raw flip rate, zero changes on a normal re-run. Both met.
