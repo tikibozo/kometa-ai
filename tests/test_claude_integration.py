@@ -286,7 +286,7 @@ class MockClaudeClient(ClaudeClient):
     def test_connection(self):
         return True
     
-    def classify_movies(self, system_prompt, collection_prompt, movies_data, batch_size=None):
+    def classify_movies(self, system_prompt, collection_prompt, movies_data):
         # Extract collection name from prompt
         import re
         match = re.search(r'categorize movies for the "(.*?)" collection', collection_prompt)
@@ -307,8 +307,10 @@ class MockClaudeClient(ClaudeClient):
         self._cost_tracking['total_output_tokens'] += 500
         self._cost_tracking['total_cost'] += 0.02
         self._cost_tracking['requests'] += 1
-        
-        return response, self.get_usage_stats()
+
+        per_request = {'total_input_tokens': 2000, 'total_output_tokens': 500,
+                       'total_cost': 0.02, 'requests': 1}
+        return response, per_request
     
     def get_usage_stats(self):
         stats = self._cost_tracking.copy()

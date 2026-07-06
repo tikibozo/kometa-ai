@@ -51,6 +51,8 @@ Kometa-AI supports two Claude backends:
 
 Either way, Kometa-AI saves results, so unless you change the collection or movie definition, it won't re-evaluate each movie against each collection on each run. Once the first run of a given collection is completed, it'll just send up new or changed movies for evaluation.
 
+> **Upgrading from a pre-2026 version?** Evaluations now include Radarr's TMDB keywords, certification, language, and ratings, which counts as a metadata change — the first run after upgrading re-evaluates your whole library once (existing decisions are used as anchors, so membership stays stable).
+
 ## Features
 
 - **AI-Powered Classification**: Leverage Claude AI to intelligently categorize movies based on sophisticated criteria

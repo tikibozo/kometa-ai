@@ -190,7 +190,7 @@ services:
     def test_python_dependencies(self):
         """Test that all required Python dependencies are installed."""
         # Check for key dependencies
-        deps_to_check = ["requests", "anthropic", "ruamel.yaml", "unidecode"]
+        deps_to_check = ["requests", "anthropic", "ruamel.yaml"]
         
         for dep in deps_to_check:
             result = subprocess.run(

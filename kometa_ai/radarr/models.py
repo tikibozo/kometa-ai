@@ -45,7 +45,14 @@ class Movie:
     overview: Optional[str] = None
     runtime: Optional[int] = None  # Minutes
     genres: List[str] = field(default_factory=list)
+    keywords: List[str] = field(default_factory=list)
     studio: Optional[str] = None
+    certification: Optional[str] = None
+    original_language: Optional[str] = None
+    # Prompt-only signals: these drift over time, so they are deliberately
+    # excluded from the metadata hash to avoid re-evaluation churn
+    imdb_rating: Optional[float] = None
+    rotten_tomatoes: Optional[int] = None
 
     # Status fields
     status: Optional[str] = None  # released, announced, etc.
@@ -62,6 +69,14 @@ class Movie:
     youtube_trailer_id: Optional[str] = None
     collection: Dict[str, Any] = field(default_factory=dict)
     alternative_titles: List[Dict[str, Any]] = field(default_factory=list)
+
+    @staticmethod
+    def _rating(data: Dict[str, Any], source: str, ndigits: int = 0, as_int: bool = False):
+        """Extract one rating value from Radarr's ratings blob, rounded."""
+        value = ((data.get('ratings') or {}).get(source) or {}).get('value')
+        if value is None or value == 0:
+            return None
+        return int(round(value)) if as_int else round(value, ndigits)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Movie':
@@ -84,8 +99,13 @@ class Movie:
             overview=data.get('overview'),
             runtime=data.get('runtime'),
             genres=data.get('genres', []),
+            keywords=data.get('keywords', []),
             tag_ids=data.get('tags', []),
             studio=data.get('studio'),
+            certification=data.get('certification'),
+            original_language=(data.get('originalLanguage') or {}).get('name'),
+            imdb_rating=cls._rating(data, 'imdb', ndigits=1),
+            rotten_tomatoes=cls._rating(data, 'rottenTomatoes', as_int=True),
             quality_profile_id=data.get('qualityProfileId'),
             monitored=data.get('monitored', True),
             status=data.get('status'),
@@ -140,6 +160,9 @@ class Movie:
             'year': self.year,
             'overview': self.overview,
             'genres': sorted(self.genres),
+            'keywords': sorted(self.keywords),
+            'certification': self.certification,
+            'original_language': self.original_language,
             'studio': self.studio,
             'youtube_trailer_id': self.youtube_trailer_id,
             'alternative_titles': sorted(

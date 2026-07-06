@@ -45,6 +45,26 @@ All in `kometa_ai/claude/processor.py` and `prompts.py`:
 Structured outputs (API backend) additionally force a reasoning-first response
 schema, which improves decision quality and eliminates JSON parse drift.
 
+Two protective behaviors guard the error paths: movies in a batch whose Claude
+call fails, and movies omitted from an otherwise-valid response, both keep
+their stored membership instead of being treated as "not included" (which
+would strip their tags).
+
+## Metadata enrichment
+
+Radarr's movie payload already carries TMDB keywords, certification, original
+language, and ratings; these now flow into the evaluation prompt. Keywords,
+certification, and language are part of the metadata hash (a change legitimately
+re-evaluates the movie, anchored to its prior decision). Ratings and other
+drifting values are prompt-only — deliberately excluded from the hash so daily
+rating wobble doesn't re-trigger evaluations.
+
+**Upgrade note:** the enrichment fields change every movie's metadata hash, so
+the first run after upgrading re-evaluates the whole library once (anchored +
+hysteresis-protected). On the API backend that is a one-time cost of roughly
+$1.50–2 per 1,000 movies per collection with claude-sonnet-5; on the CLI
+backend it is subscription time only.
+
 ## Measuring
 
 `scripts/consistency_check.py` runs a collection twice from blank state

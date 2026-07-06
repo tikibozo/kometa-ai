@@ -238,107 +238,21 @@ NOTIFICATION_RECIPIENTS=user@example.com \
 ./run_local.sh --health-check
 ```
 
-## Performance Testing and Optimization
+## Performance Testing
 
-Kometa-AI includes comprehensive tools for performance testing, profiling, and optimization, particularly for large movie libraries.
-
-### Running Performance Tests
-
-#### Using Command-line Options
-
-The main application includes built-in performance profiling options:
+For measuring decision consistency and evaluating changes against a real or
+synthetic library, use the consistency benchmark:
 
 ```bash
-# Enable performance profiling for a run
+# Synthetic data
+python generate_test_data.py -n 1000 -o test_data/medium_test.json
+python scripts/consistency_check.py --movies test_data/medium_test.json --config-dir kometa-config
 
-# Save profiling results to a specific file
-
-# Run with more detailed memory profiling
-
-# Run batch size optimization test
+# Or read-only against a live Radarr
+RADARR_URL=... RADARR_API_KEY=... python scripts/consistency_check.py --radarr --config-dir kometa-config --limit 100
 ```
 
-#### Using Test Scripts
-
-For more detailed performance testing with synthetic data:
-
-1. Generate test data:
-   ```bash
-   # Generate a small dataset (50 movies)
-   python generate_test_data.py -n 50 -o test_data/small_test.json
-
-   # Generate a medium dataset (1000 movies)
-   python generate_test_data.py -n 1000 -o test_data/medium_test.json
-
-   # Generate a large dataset (10000 movies)
-   python generate_test_data.py -n 10000 -o test_data/large_test.json
-   ```
-
-2. Run performance tests:
-   ```bash
-   # Test with small dataset
-
-   # Test with batch size optimization
-   ```
-
-### Understanding Profiling Results
-
-Performance profiling results are saved as JSON files with the following structure:
-
-```json
-{
-  "timing": {
-    "total_duration": 120.5,
-    "collection_durations": {...}
-  },
-  "memory": {
-    "peak": {"rss_peak": 256000000, "vms_peak": 512000000},
-    "current": {...},
-    "diff": {...},
-    "top_allocations": [...]
-  },
-  "api_calls": {
-    "claude/messages": {
-      "count": 10,
-      "input_tokens": 80000,
-      "output_tokens": 5000
-    }
-  },
-  "batch_efficiency": {
-    "150": {
-      "count": 8,
-      "total_items": 1200,
-      "efficiency": 0.97
-    }
-  },
-  "collections": {
-    "Film Noir": {
-      "duration": 45.2,
-      "movies_processed": 453,
-      "from_cache": 547,
-      "tokens": {
-        "input": 45300,
-        "output": 2200
-      }
-    }
-  }
-}
-```
-
-Key metrics to look for:
-- **Memory peak**: The maximum memory usage during processing
-- **Total duration**: Overall processing time
-- **Tokens used**: API token usage (affects cost)
-- **Efficiency**: How efficiently batches are utilized
-
-### Optimizing for Large Libraries
-
-For best performance with large movie libraries (5,000+ movies):
-
-Consider these optimization options:
-- Decrease collection count if processing too many collections
-- Fine-tune batch size (`--batch-size`) based on your system's memory constraints
-- Adjust scheduling for less frequent but more optimized runs
+Per-run cost and token usage are logged at the end of each processing run.
 
 ## Development Best Practices
 
@@ -346,7 +260,6 @@ Consider these optimization options:
 2. **Check Coverage**: Aim to maintain or improve the test coverage percentage
 3. **Use Dry Run**: Always test changes with `--dry-run` before applying them to your Radarr library
 4. **Debug Logging**: Enable debug logging with `DEBUG_LOGGING=true` to see detailed operation
-5. **Profile Performance**: Use profiling tools to identify and fix bottlenecks for large libraries
 
 ## Troubleshooting
 

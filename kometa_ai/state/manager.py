@@ -72,13 +72,18 @@ class StateManager:
             logger.error(f"Error loading state: {e}")
             self._try_restore_backup()
 
-    def save(self) -> None:
-        """Save state to disk."""
+    def save(self, backup: bool = True) -> None:
+        """Save state to disk.
+
+        Args:
+            backup: Rotate a timestamped backup first. Pass False for
+                mid-run checkpoints so the backup window protects against a
+                bad run rather than rotating away within a single one.
+        """
         try:
             logger.info(f"Saving state to {self.state_file}")
 
-            # Create a backup first
-            if self.state_file.exists():
+            if backup and self.state_file.exists():
                 self._create_backup()
 
             # Update timestamp

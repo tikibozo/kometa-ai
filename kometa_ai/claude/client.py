@@ -1,12 +1,27 @@
 import logging
 import json
-from typing import Dict, Any, Optional, Tuple, cast
+from typing import Dict, Any, Optional, Protocol, Tuple, cast
 from datetime import datetime, UTC
 
 import anthropic
 from anthropic import Anthropic
 
 logger = logging.getLogger(__name__)
+
+
+class ClaudeBackend(Protocol):
+    """The contract both Claude backends (API and CLI) must satisfy."""
+
+    model: str
+
+    def classify_movies(
+        self, system_prompt: str, collection_prompt: str, movies_data: str
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]: ...
+
+    def get_usage_stats(self) -> Dict[str, Any]: ...
+
+    def reset_usage_stats(self) -> None: ...
+
 
 DEFAULT_MODEL = "claude-sonnet-5"
 # Default batch size for movie processing
@@ -149,18 +164,29 @@ class ClaudeClient:
 
         user_prompt = f"{collection_prompt}\n\nMOVIES TO EVALUATE:\n{movies_data}"
 
-        response = self.client.messages.create(
+        # Stream so the large max_tokens doesn't hit SDK HTTP timeouts; the
+        # cap leaves headroom for per-movie reasoning on a full batch
+        with self.client.messages.stream(
             model=self.model,
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
-            max_tokens=16000,
+            max_tokens=32000,
             output_config={"format": {"type": "json_schema", "schema": DECISIONS_SCHEMA}},
-        )
+        ) as stream:
+            response = stream.get_final_message()
 
         usage_stats = self._track_usage(response)
 
         if self.debug_mode:
             logger.debug(f"Claude response: {response.content}")
+
+        if response.stop_reason == "max_tokens":
+            # Truncated JSON would fail identically on every run (batches are
+            # deterministic) — surface the actionable fix instead
+            raise ValueError(
+                "Claude response hit the max_tokens cap and is truncated; "
+                "reduce --batch-size for this library"
+            )
 
         text = next((block.text for block in response.content if block.type == "text"), None)
         if not text:

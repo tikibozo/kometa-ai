@@ -203,3 +203,96 @@ class TestPriorDecisionAnchoring:
         run(client, state_manager, collection, movies)
 
         assert "previous_decision" not in client.batches[0][0]
+
+
+class TestApplyStatusQuo:
+    """Direct tests of the pure decision policy, including boundaries."""
+
+    def _prior(self, include, confidence, revisions=0):
+        from kometa_ai.state.models import DecisionRecord
+        return DecisionRecord(
+            movie_id=1, collection_name="Test", include=include,
+            confidence=confidence, metadata_hash="h", tag="KAI-test",
+            timestamp="2026-01-01T00:00:00Z", revisions=revisions,
+        )
+
+    def test_no_prior_passes_through(self):
+        from kometa_ai.claude.processor import apply_status_quo
+        include, confidence, reasoning, revisions = apply_status_quo(
+            None, True, 0.9, "clear fit", 0.7, "no previous decision")
+        assert (include, confidence, reasoning, revisions) == (True, 0.9, "clear fit", 0)
+
+    def test_extreme_threshold_remains_flippable(self):
+        from kometa_ai.claude.processor import apply_status_quo
+        # threshold 0.95: flip-in gate would be 1.05 without clamping
+        prior = self._prior(include=False, confidence=0.9)
+        include, confidence, _, _ = apply_status_quo(
+            prior, True, 1.0, None, 0.95, "metadata changed")
+        assert include is True and confidence == 1.0
+
+    def test_blocked_flip_keeps_prior_values(self):
+        from kometa_ai.claude.processor import apply_status_quo
+        prior = self._prior(include=True, confidence=0.9)
+        include, confidence, reasoning, _ = apply_status_quo(
+            prior, False, 0.35, "changed my mind a bit", 0.7, "metadata changed")
+        # score 0.65 > 0.6 margin: status quo wins
+        assert include is True and confidence == 0.9
+
+    def test_exclusion_confidence_uses_membership_score(self):
+        from kometa_ai.claude.processor import apply_status_quo
+        prior = self._prior(include=True, confidence=0.9)
+        # Confident exclusion: include=False at 0.8 -> score 0.2, flips out
+        include, _, _, _ = apply_status_quo(
+            prior, False, 0.8, None, 0.7, "metadata changed")
+        assert include is False
+
+    def test_revisions_increment_only_for_near_threshold(self):
+        from kometa_ai.claude.processor import apply_status_quo, REASON_NEAR_THRESHOLD
+        prior = self._prior(include=True, confidence=0.72, revisions=0)
+        _, _, _, revisions = apply_status_quo(
+            prior, True, 0.72, None, 0.7, REASON_NEAR_THRESHOLD)
+        assert revisions == 1
+        _, _, _, revisions = apply_status_quo(
+            prior, True, 0.72, None, 0.7, "metadata changed")
+        assert revisions == 0
+
+
+class TestBorderlineExclusions:
+    def test_borderline_exclusion_is_reevaluated(self, client, state_manager, collection):
+        """include=False at low confidence is borderline (score near threshold)."""
+        movies = [make_movie(1)]
+        client.script[1] = (False, 0.35)  # score 0.65 -> within 0.15 of 0.7
+        run(client, state_manager, collection, movies)
+
+        run(client, state_manager, collection, movies)
+        assert len(client.batches) == 2  # re-evaluated once
+
+    def test_decisive_exclusion_is_not_reevaluated(self, client, state_manager, collection):
+        movies = [make_movie(1)]
+        client.script[1] = (False, 0.65)  # score 0.35 -> decisively out
+        run(client, state_manager, collection, movies)
+
+        run(client, state_manager, collection, movies)
+        assert len(client.batches) == 1
+
+
+class TestIncompleteResponses:
+    def test_omitted_movies_keep_stored_membership(self, client, state_manager, collection):
+        """Movies missing from Claude's response must not lose their tags."""
+        movies = [make_movie(1), make_movie(2)]
+        client.script[1] = (True, 0.95)
+        client.script[2] = (True, 0.72)  # near threshold -> re-evaluated next run
+        run(client, state_manager, collection, movies)
+
+        # Second run: respond only for movie 2's companion... omit movie 2
+        original = client.classify_movies
+
+        def drop_movie_2(system_prompt, collection_prompt, movies_data):
+            response, usage = original(system_prompt, collection_prompt, movies_data)
+            response["decisions"] = [d for d in response["decisions"] if d["movie_id"] != 2]
+            return response, usage
+
+        client.classify_movies = drop_movie_2
+        included, excluded, _ = run(client, state_manager, collection, movies)
+
+        assert 2 in included  # stored membership preserved

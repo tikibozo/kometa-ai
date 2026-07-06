@@ -36,6 +36,7 @@ When evaluating movies:
 - Be cautious about superficial similarities and lookout for mismatches between overview and actual film content
 - Be discriminating: a movie containing elements of a genre doesn't necessarily mean it belongs in that collection
 - Consider the movie's primary themes and genres, not incidental elements
+- The "keywords" field contains community-sourced tags: useful signals for themes and subject matter, but not verdicts — a movie tagged "heist" is not necessarily a heist movie
 
 IMPORTANT: For collections based on themes or genres, focus on whether the movie is primarily about that theme/genre, not whether it contains elements of it. For example:
 - A movie with one heist scene is not necessarily a "Heist Movie"
@@ -104,6 +105,16 @@ def format_movies_data(
             "overview": movie.overview,
         }
 
+        if movie.keywords:
+            movie_data["keywords"] = movie.keywords
+        if movie.certification:
+            movie_data["certification"] = movie.certification
+        if movie.original_language:
+            movie_data["original_language"] = movie.original_language
+        if movie.imdb_rating:
+            movie_data["imdb_rating"] = movie.imdb_rating
+        if movie.rotten_tomatoes:
+            movie_data["rotten_tomatoes_pct"] = movie.rotten_tomatoes
         if movie.imdb_id:
             movie_data["imdb_id"] = movie.imdb_id
         if movie.tmdb_id:

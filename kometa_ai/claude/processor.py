@@ -3,7 +3,7 @@ import math
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, UTC
 
-from kometa_ai.claude.client import ClaudeClient, DEFAULT_BATCH_SIZE
+from kometa_ai.claude.client import ClaudeBackend, DEFAULT_BATCH_SIZE
 from kometa_ai.claude.prompts import get_system_prompt, format_collection_prompt, format_movies_data
 from kometa_ai.radarr.models import Movie
 from kometa_ai.kometa.models import CollectionConfig
@@ -21,10 +21,67 @@ MAX_REVISIONS = 1
 # clears the threshold by this margin on the opposite side (status quo bias).
 HYSTERESIS_MARGIN = 0.1
 
+# Movies whose membership score is within this buffer of the threshold get
+# re-evaluated (bounded by MAX_REVISIONS)
+THRESHOLD_BUFFER = 0.15
+
+# Reprocessing reasons — shared between selection and revision accounting
+REASON_NO_DECISION = "no previous decision"
+REASON_METADATA_CHANGED = "metadata changed"
+REASON_NEAR_THRESHOLD = "near threshold confidence"
+
+
+def membership_score(include: bool, confidence: float) -> float:
+    """Estimated probability the movie belongs, regardless of which way the
+    include flag points (confidence is confidence in the stated verdict)."""
+    return confidence if include else 1.0 - confidence
+
 
 def is_member(include: bool, confidence: float, threshold: float) -> bool:
     """The single membership rule: include verdict at or above the threshold."""
     return include and confidence >= threshold
+
+
+def apply_status_quo(
+    prior: Optional[DecisionRecord],
+    include: bool,
+    confidence: float,
+    reasoning: Optional[str],
+    threshold: float,
+    reason: Optional[str],
+    force_refresh: bool = False,
+) -> Tuple[bool, float, Optional[str], int]:
+    """Apply hysteresis and revision accounting to a fresh evaluation.
+
+    A re-evaluation may only flip the stored decision if the new membership
+    score clears the threshold by HYSTERESIS_MARGIN on the opposite side
+    (clamped to [0, 1] so extreme thresholds remain flippable). Near-threshold
+    re-evaluations consume the revision budget; everything else resets it.
+
+    Returns:
+        (include, confidence, reasoning, revisions) to record
+    """
+    if prior is not None and not force_refresh:
+        new_score = membership_score(include, confidence)
+        prior_member = is_member(prior.include, prior.confidence, threshold)
+        new_member = is_member(include, confidence, threshold)
+        if prior_member != new_member:
+            flip_allowed = (
+                new_score <= max(threshold - HYSTERESIS_MARGIN, 0.0)
+                if prior_member
+                else new_score >= min(threshold + HYSTERESIS_MARGIN, 1.0)
+            )
+            if not flip_allowed:
+                include = prior.include
+                confidence = prior.confidence
+                reasoning = prior.reasoning
+
+    if prior is not None and reason == REASON_NEAR_THRESHOLD:
+        revisions = prior.revisions + 1
+    else:
+        revisions = 0
+
+    return include, confidence, reasoning, revisions
 
 
 class MovieProcessor:
@@ -32,7 +89,7 @@ class MovieProcessor:
 
     def __init__(
         self,
-        claude_client: ClaudeClient,
+        claude_client: ClaudeBackend,
         state_manager: StateManager,
         batch_size: Optional[int] = None,
         force_refresh: bool = False
@@ -40,7 +97,7 @@ class MovieProcessor:
         """Initialize the movie processor.
 
         Args:
-            claude_client: Claude API client
+            claude_client: Claude backend (API or CLI)
             state_manager: State manager for persisting decisions
             batch_size: Number of movies to process in each batch
             force_refresh: Force reprocessing of all movies, ignoring cached decisions
@@ -51,8 +108,32 @@ class MovieProcessor:
         self.force_refresh = force_refresh
         self.system_prompt = get_system_prompt()
 
+        # Metadata hashes are collection-independent; cache per movie so a
+        # multi-collection run hashes each movie once
+        self._hash_cache: Dict[int, str] = {}
+
         # Store usage statistics for each collection
         self.collection_stats: Dict[str, Dict[str, Any]] = {}
+
+    def _metadata_hash(self, movie: Movie) -> str:
+        h = self._hash_cache.get(movie.id)
+        if h is None:
+            h = movie.calculate_metadata_hash()
+            self._hash_cache[movie.id] = h
+        return h
+
+    @staticmethod
+    def _apply_cached(
+        decision: DecisionRecord,
+        threshold: float,
+        included_ids: List[int],
+        excluded_ids: List[int],
+    ) -> None:
+        """Route a stored decision into the included/excluded lists."""
+        if is_member(decision.include, decision.confidence, threshold):
+            included_ids.append(decision.movie_id)
+        else:
+            excluded_ids.append(decision.movie_id)
 
     def process_collection(
         self,
@@ -72,6 +153,7 @@ class MovieProcessor:
             logger.info(f"Collection '{collection.name}' is disabled, skipping")
             return [], [], {}
 
+        threshold = collection.confidence_threshold
         logger.info(f"Processing collection '{collection.name}' with {len(movies)} movies")
 
         existing_decisions: Dict[int, DecisionRecord] = {}
@@ -90,53 +172,47 @@ class MovieProcessor:
             # Process movies that:
             # 1. Don't have a previous decision
             # 2. Have metadata changes
-            # 3. Had a confidence score near the threshold, and haven't
-            #    exhausted their re-evaluation budget (MAX_REVISIONS)
-            threshold_buffer = 0.15  # Reprocess movies near threshold
+            # 3. Scored near the threshold, and haven't exhausted their
+            #    re-evaluation budget (MAX_REVISIONS)
             for movie in movies:
-                current_hash = movie.calculate_metadata_hash()
+                current_hash = self._metadata_hash(movie)
                 stored_hash = self.state_manager.get_metadata_hash(movie.id)
                 decision = existing_decisions.get(movie.id)
 
-                should_process = False
                 reason = None
 
                 if not decision:
-                    should_process = True
-                    reason = "no previous decision"
+                    reason = REASON_NO_DECISION
                 elif stored_hash != current_hash:
-                    should_process = True
-                    reason = "metadata changed"
+                    reason = REASON_METADATA_CHANGED
                 elif (decision.revisions < MAX_REVISIONS
-                        and abs(decision.confidence - collection.confidence_threshold) < threshold_buffer):
-                    should_process = True
-                    reason = "near threshold confidence"
+                        and abs(membership_score(decision.include, decision.confidence)
+                                - threshold) < THRESHOLD_BUFFER):
+                    reason = REASON_NEAR_THRESHOLD
 
-                if should_process:
+                if reason:
                     movies_to_process.append(movie)
-                    if reason:
-                        reprocess_reasons[movie.id] = reason
-                        logger.debug(f"Processing movie {movie.id} ({movie.title}): {reason}")
+                    reprocess_reasons[movie.id] = reason
+                    logger.debug(f"Processing movie {movie.id} ({movie.title}): {reason}")
 
             logger.info(f"Processing {len(movies_to_process)} of {len(movies)} movies for collection '{collection.name}'")
 
         # Sort so identical inputs always produce identical batches; batch
         # composition affects Claude's judgments, so keep it deterministic.
         movies_to_process.sort(key=lambda m: m.id)
+        to_process_ids = {movie.id for movie in movies_to_process}
+        cached_count = sum(1 for movie_id in existing_decisions if movie_id not in to_process_ids)
 
         # If no movies need processing, use existing decisions
         if not movies_to_process:
             logger.info(f"No movies need processing for collection '{collection.name}'")
-            included_ids = []
-            excluded_ids = []
+            included_ids: List[int] = []
+            excluded_ids: List[int] = []
 
-            for movie_id, decision in existing_decisions.items():
-                if is_member(decision.include, decision.confidence, collection.confidence_threshold):
-                    included_ids.append(movie_id)
-                else:
-                    excluded_ids.append(movie_id)
+            for decision in existing_decisions.values():
+                self._apply_cached(decision, threshold, included_ids, excluded_ids)
 
-            return included_ids, excluded_ids, {"movie_count": len(movies), "processed_movies": 0, "from_cache": len(existing_decisions)}
+            return included_ids, excluded_ids, {"movie_count": len(movies), "processed_movies": 0, "from_cache": cached_count}
 
         # Process in batches
         included_ids = []
@@ -148,18 +224,13 @@ class MovieProcessor:
             'requests': 0,
             'batches': 0,
             'processed_movies': 0,
-            'from_cache': len(existing_decisions) - len(movies_to_process)
+            'from_cache': cached_count
         }
 
         # Reserve existing decisions for movies not being reprocessed
-        to_process_ids = {movie.id for movie in movies_to_process}
-        for movie in movies:
-            if movie.id not in to_process_ids and movie.id in existing_decisions:
-                decision = existing_decisions[movie.id]
-                if is_member(decision.include, decision.confidence, collection.confidence_threshold):
-                    included_ids.append(movie.id)
-                else:
-                    excluded_ids.append(movie.id)
+        for movie_id, decision in existing_decisions.items():
+            if movie_id not in to_process_ids:
+                self._apply_cached(decision, threshold, included_ids, excluded_ids)
 
         # Process movies in batches
         collection_prompt = format_collection_prompt(collection)
@@ -186,7 +257,7 @@ class MovieProcessor:
                 }
             movies_data = format_movies_data(batch_movies, batch_priors)
 
-            # Call Claude API
+            # Call Claude
             try:
                 response, usage_stats = self.claude_client.classify_movies(
                     self.system_prompt,
@@ -217,14 +288,13 @@ class MovieProcessor:
                     context=f"collection:{collection.name},batch:{batch_index + 1}",
                     error_message=str(e)
                 )
-                # Preserve existing membership for this batch: without a new
-                # decision, a previously tagged movie would otherwise be
-                # treated as "not included" and lose its tag on an API error
+                # Without a new decision, previously evaluated movies must
+                # keep their stored membership — otherwise an API error would
+                # strip tags from standing members
                 for movie in batch_movies:
                     prior = existing_decisions.get(movie.id)
-                    if prior and is_member(prior.include, prior.confidence,
-                                           collection.confidence_threshold):
-                        included_ids.append(movie.id)
+                    if prior:
+                        self._apply_cached(prior, threshold, included_ids, excluded_ids)
 
         # Store collection-specific stats
         self.collection_stats[collection.name] = all_usage_stats
@@ -268,9 +338,11 @@ class MovieProcessor:
             raise ValueError("Invalid response format: missing 'decisions' key")
 
         decisions = response['decisions']
-        included_ids = []
-        excluded_ids = []
+        threshold = collection.confidence_threshold
+        included_ids: List[int] = []
+        excluded_ids: List[int] = []
         movie_map = {movie.id: movie for movie in batch_movies}
+        decided_ids = set()
 
         for decision_data in decisions:
             movie_id = decision_data.get('movie_id')
@@ -280,45 +352,25 @@ class MovieProcessor:
                 continue
 
             movie = movie_map[movie_id]
-            include = decision_data.get('include', False)
-            confidence = decision_data.get('confidence', 0.0)
-            reasoning = decision_data.get('reasoning')
-
-            # Apply status-quo bias: a re-evaluation may only flip the
-            # stored decision if it clears the threshold by the hysteresis
-            # margin on the opposite side. Otherwise keep the prior call.
-            reason = (reprocess_reasons or {}).get(movie_id)
+            decided_ids.add(movie_id)
             prior = (prior_decisions or {}).get(movie_id)
-            threshold = collection.confidence_threshold
-            if prior is not None and not self.force_refresh:
-                # Estimated probability the movie belongs, regardless of
-                # which way the include flag points
-                new_score = confidence if include else 1.0 - confidence
-                prior_member = is_member(prior.include, prior.confidence, threshold)
-                new_member = is_member(include, confidence, threshold)
-                if prior_member != new_member:
-                    flip_allowed = (
-                        new_score <= threshold - HYSTERESIS_MARGIN
-                        if prior_member
-                        else new_score >= threshold + HYSTERESIS_MARGIN
-                    )
-                    if not flip_allowed:
-                        logger.info(
-                            f"Keeping prior decision for movie {movie_id} ({movie.title}) "
-                            f"in '{collection.name}': new evaluation "
-                            f"(include={include}, confidence={confidence:.2f}) does not "
-                            f"clear the hysteresis margin"
-                        )
-                        include = prior.include
-                        confidence = prior.confidence
-                        reasoning = prior.reasoning
+            reason = (reprocess_reasons or {}).get(movie_id)
+            raw_include = decision_data.get('include', False)
 
-            # Near-threshold re-evaluations consume the revision budget;
-            # fresh evaluations and metadata changes reset it
-            if prior is not None and reason == "near threshold confidence":
-                revisions = prior.revisions + 1
-            else:
-                revisions = 0
+            include, confidence, reasoning, revisions = apply_status_quo(
+                prior=prior,
+                include=raw_include,
+                confidence=decision_data.get('confidence', 0.0),
+                reasoning=decision_data.get('reasoning'),
+                threshold=threshold,
+                reason=reason,
+                force_refresh=self.force_refresh,
+            )
+            if prior is not None and include != raw_include:
+                logger.info(
+                    f"Keeping prior decision for movie {movie_id} ({movie.title}) "
+                    f"in '{collection.name}': new evaluation did not clear the hysteresis margin"
+                )
 
             # Create decision record
             decision = DecisionRecord(
@@ -326,7 +378,7 @@ class MovieProcessor:
                 collection_name=collection.name,
                 include=include,
                 confidence=confidence,
-                metadata_hash=movie.calculate_metadata_hash(),
+                metadata_hash=self._metadata_hash(movie),
                 tag=collection.tag,
                 timestamp=datetime.now(UTC).isoformat(),
                 reasoning=reasoning,
@@ -337,7 +389,7 @@ class MovieProcessor:
             self.state_manager.set_decision(decision)
 
             # Add to included/excluded lists based on threshold
-            if is_member(include, confidence, collection.confidence_threshold):
+            if is_member(include, confidence, threshold):
                 included_ids.append(movie_id)
                 logger.debug(
                     f"Including movie {movie_id} ({movie.title}) in collection '{collection.name}' "
@@ -350,9 +402,22 @@ class MovieProcessor:
                     f"with confidence {confidence:.2f}"
                 )
 
-        # Checkpoint state after each batch to ensure we don't lose decisions
-        # if we crash later
-        self.state_manager.save()
+        # Movies Claude omitted from the response keep their stored
+        # membership — otherwise an incomplete response would strip tags
+        missing = [m for m in batch_movies if m.id not in decided_ids]
+        if missing:
+            logger.warning(
+                f"Claude response omitted {len(missing)} of {len(batch_movies)} movies "
+                f"for '{collection.name}'; keeping their stored membership"
+            )
+            for movie in missing:
+                prior = (prior_decisions or {}).get(movie.id)
+                if prior:
+                    self._apply_cached(prior, threshold, included_ids, excluded_ids)
+
+        # Checkpoint state after each batch so a crash doesn't lose paid-for
+        # decisions; skip the backup rotation (one backup per run is enough)
+        self.state_manager.save(backup=False)
 
         return included_ids, excluded_ids
 

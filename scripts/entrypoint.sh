@@ -26,5 +26,8 @@ if [ -d /app/.claude ]; then
     chown -R kometa:kometa /app/.claude
 fi
 
-# Switch to kometa user and run the command
+# Switch to kometa user and run the command. gosu preserves the environment,
+# so set HOME explicitly — the claude CLI (CLAUDE_BACKEND=cli) resolves its
+# credentials from $HOME/.claude
+export HOME=/app
 exec gosu kometa "$@"

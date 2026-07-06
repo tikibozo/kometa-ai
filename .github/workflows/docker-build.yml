@@ -1,0 +1,69 @@
+name: Docker Build
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Release version (e.g. 1.2.3)"
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 1.2.3)"
+        required: true
+        type: string
+
+jobs:
+  build-and-push:
+    name: Trivy-gated multi-arch build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Build a local amd64 image first so Trivy can gate BEFORE anything is pushed
+      - name: Build local image for scanning
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: kometa-ai:scan
+          cache-from: type=registry,ref=tikibozo/kometa-ai:buildcache
+
+      - name: Trivy gate (HIGH/CRITICAL block the release)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: kometa-ai:scan
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Compute tags
+        id: tags
+        run: |
+          VERSION="${{ inputs.version }}"
+          MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
+          echo "tags=tikibozo/kometa-ai:$VERSION,tikibozo/kometa-ai:$MAJOR_MINOR,tikibozo/kometa-ai:latest" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=registry,ref=tikibozo/kometa-ai:buildcache
+          cache-to: type=registry,ref=tikibozo/kometa-ai:buildcache,mode=max

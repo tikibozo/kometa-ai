@@ -14,7 +14,7 @@ from kometa_ai.config import Config
 from kometa_ai.utils.logging import setup_logging
 from kometa_ai.utils.scheduling import calculate_next_run_time, sleep_until
 from kometa_ai.radarr.client import RadarrClient
-from kometa_ai.claude.client import ClaudeClient
+from kometa_ai.claude.client import ClaudeBackend, ClaudeClient
 from kometa_ai.claude.cli_client import ClaudeCliClient
 from kometa_ai.claude.processor import MovieProcessor
 from kometa_ai.kometa.parser import KometaParser
@@ -153,7 +153,7 @@ def run_health_check() -> bool:
         return False
 
 
-def make_claude_client() -> Optional[Any]:
+def make_claude_client() -> Optional[ClaudeBackend]:
     """Build the configured Claude backend (API key or CLI/subscription).
 
     Returns:
@@ -186,7 +186,7 @@ def make_claude_client() -> Optional[Any]:
 
 def process_collections(
     radarr_client: RadarrClient,
-    claude_client: Any,
+    claude_client: ClaudeBackend,
     state_manager: StateManager,
     collections: List[Any],
     all_movies: Optional[List[Any]] = None,
@@ -501,34 +501,25 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
         if claude_client is None:
             return 1
 
-        # Parse Kometa configuration
-        logger.info("Loading collection configurations...")
         kometa_parser = KometaParser(kometa_config_dir)
-        all_collections = kometa_parser.parse_configs()
 
-        # Filter collections if --collection argument is provided
-        if args.collection:
-            logger.info(f"Filtering for collection: '{args.collection}'")
-            collections = [
-                c for c in all_collections
-                if c.name.lower() == args.collection.lower()
-            ]
-            if not collections:
-                logger.error(
-                    f"Collection '{args.collection}' not found or not enabled")
-                return 1
-            logger.info(
-                f"Found collection '{args.collection}'")
-        else:
-            collections = all_collections
+        def load_collections():
+            logger.info("Loading collection configurations...")
+            all_collections = kometa_parser.parse_configs()
+            if args.collection:
+                matched = [
+                    c for c in all_collections
+                    if c.name.lower() == args.collection.lower()
+                ]
+                if not matched:
+                    logger.error(
+                        f"Collection '{args.collection}' not found or not enabled")
+                return matched
+            return all_collections
 
-        logger.info(
-            f"Found {len(collections)} collections to process")
-           
-        # Fetch movies once to use for both regular processing and optimization
-        logger.info("Fetching movies from Radarr")
-        all_movies = radarr_client.get_movies()
-        logger.info(f"Retrieved {len(all_movies)} movies from Radarr")
+        # Validate configuration before entering the schedule loop
+        if not load_collections():
+            return 1
 
         # Calculate next run time if not in run-now mode
         if not args.run_now:
@@ -551,6 +542,15 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
             formatted_start = run_start_time.strftime("%Y-%m-%d %H:%M:%S")
             logger.info(
                 f"Starting processing run at {formatted_start}")
+
+            # Refresh config and library each run — the daemon can run for
+            # weeks, and stale snapshots would miss new movies and re-apply
+            # tags against day-one state
+            collections = load_collections()
+            logger.info(f"Found {len(collections)} collections to process")
+            logger.info("Fetching movies from Radarr")
+            all_movies = radarr_client.get_movies()
+            logger.info(f"Retrieved {len(all_movies)} movies from Radarr")
 
             results = process_collections(
                 radarr_client=radarr_client,
