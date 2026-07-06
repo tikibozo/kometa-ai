@@ -1,11 +1,11 @@
+import re
+
 from setuptools import setup, find_packages
 
-# Read version without importing
+# Read version without importing (the trailing comment is a
+# release-please annotation)
 with open("kometa_ai/__version__.py", "r") as f:
-    for line in f:
-        if line.startswith("__version__"):
-            version = line.split("=")[1].strip().strip('"')
-            break
+    version = re.search(r'__version__\s*=\s*"([^"]+)"', f.read()).group(1)
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
