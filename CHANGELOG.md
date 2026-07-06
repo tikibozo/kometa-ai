@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/tikibozo/kometa-ai/compare/v0.2.3...v0.2.4) (2026-07-06)
+
+
+### Bug Fixes
+
+* strip YAML quoting from parsed collection names ([#9](https://github.com/tikibozo/kometa-ai/issues/9)) ([c6dd38b](https://github.com/tikibozo/kometa-ai/commit/c6dd38b969a32556e5ac95413b1f7ee4401ccfc8))
+
 ## [0.2.3](https://github.com/tikibozo/kometa-ai/compare/v0.2.2...v0.2.3) (2026-07-06)
 
 
