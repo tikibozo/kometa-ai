@@ -47,7 +47,11 @@ So that's what this does - give it some interesting collection name/prompt, and 
 Kometa-AI supports two Claude backends:
 
 - **`CLAUDE_BACKEND=api`** (default): calls the Anthropic API with a `CLAUDE_API_KEY`. This bills per token — it won't cost much (the app reports actual costs per run), but it is real money and separate from a chat subscription. See [Claude Console](https://console.anthropic.com/settings/keys) to create an API key.
-- **`CLAUDE_BACKEND=cli`**: shells out to the [Claude Code CLI](https://claude.com/claude-code) using whatever it's logged in with — typically a Claude subscription, so runs don't bill per token. The container downloads the CLI automatically on first start when this backend is selected; mount your Claude credentials directory at `/app/.claude`.
+- **`CLAUDE_BACKEND=cli`**: shells out to the [Claude Code CLI](https://claude.com/claude-code) using whatever it's logged in with — typically a Claude subscription, so runs don't bill per token. The container downloads the CLI automatically on first start when this backend is selected. Authenticate either way:
+  - **`CLAUDE_CODE_OAUTH_TOKEN` env var** (recommended for containers): generate a long-lived token with `claude setup-token` on a logged-in machine and pass it as an environment variable — no volume mount needed.
+  - **Credentials mount**: mount your `~/.claude` directory at `/app/.claude`.
+
+  Cost lines logged with the `cli` backend are the CLI's notional API-equivalent cost; subscription usage isn't billed per token.
 
 Either way, Kometa-AI saves results, so unless you change the collection or movie definition, it won't re-evaluate each movie against each collection on each run. Once the first run of a given collection is completed, it'll just send up new or changed movies for evaluation.
 
