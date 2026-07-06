@@ -1,5 +1,5 @@
 # Stage 1: Builder stage
-FROM python:3.11-slim-bullseye AS builder
+FROM python:3.12-slim AS builder
 
 # Set environment variables for pip
 ENV PIP_NO_CACHE_DIR=1 \
@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && pip wheel --wheel-dir=/wheels -r requirements.txt
 
 # Stage 2: Final image
-FROM python:3.11-slim-bullseye
+FROM python:3.12-slim
 
 # Set label metadata
 LABEL maintainer="Kometa-AI Team" \
