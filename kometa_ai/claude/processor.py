@@ -3,7 +3,7 @@ import math
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, UTC
 
-from kometa_ai.claude.client import ClaudeBackend, DEFAULT_BATCH_SIZE
+from kometa_ai.claude.client import ClaudeBackend, ClaudeUsageLimitError, DEFAULT_BATCH_SIZE
 from kometa_ai.claude.prompts import get_system_prompt, format_collection_prompt, format_movies_data
 from kometa_ai.radarr.models import Movie
 from kometa_ai.kometa.models import CollectionConfig
@@ -114,6 +114,11 @@ class MovieProcessor:
 
         # Store usage statistics for each collection
         self.collection_stats: Dict[str, Dict[str, Any]] = {}
+
+        # Set when Claude declines further work because a usage/rate limit was
+        # hit. It's a whole-run condition, so the caller should stop after the
+        # current collection rather than start the next one.
+        self.usage_limited = False
 
     def _metadata_hash(self, movie: Movie) -> str:
         h = self._hash_cache.get(movie.id)
@@ -281,6 +286,27 @@ class MovieProcessor:
 
                 included_ids.extend(batch_included)
                 excluded_ids.extend(batch_excluded)
+
+            except ClaudeUsageLimitError as e:
+                # A usage limit is a whole-run condition: every remaining batch
+                # would fail identically. Stop here rather than blast dozens of
+                # instant failures; already-decided batches are checkpointed, so
+                # the unprocessed movies simply resume on the next scheduled run.
+                logger.warning(
+                    f"Claude usage limit reached at batch {batch_index + 1}/{num_batches} "
+                    f"for '{collection.name}'; stopping this run. "
+                    f"Remaining movies resume on the next scheduled run. ({e})"
+                )
+                self.state_manager.log_error(
+                    context=f"collection:{collection.name}",
+                    error_message=f"Usage limit reached at batch {batch_index + 1}/{num_batches}; run stopped early"
+                )
+                self.usage_limited = True
+                for movie in batch_movies:
+                    prior = existing_decisions.get(movie.id)
+                    if prior:
+                        self._apply_cached(prior, threshold, included_ids, excluded_ids)
+                break
 
             except Exception as e:
                 logger.error(f"Error processing batch {batch_index + 1}: {e}")

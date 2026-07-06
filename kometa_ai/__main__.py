@@ -336,6 +336,16 @@ def process_collections(
                 "traceback": traceback.format_exc()
             })
 
+        # A usage limit stops the whole run: the remaining collections would
+        # only hit the same limit. Decided movies are already tagged and
+        # checkpointed, so they resume on the next scheduled run.
+        if processor.usage_limited:
+            logger.warning(
+                "Stopping run early — Claude usage limit reached. Remaining "
+                "collections and movies will resume on the next scheduled run."
+            )
+            break
+
     # Save state with all changes and errors
     state_manager.save()
 
