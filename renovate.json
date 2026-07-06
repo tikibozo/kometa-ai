@@ -1,0 +1,33 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "America/Los_Angeles",
+  "schedule": ["* * * * 0"],
+  "automerge": true,
+  "platformAutomerge": true,
+  "automergeStrategy": "squash",
+  "dependencyDashboard": true,
+  "labels": ["renovate"],
+  "packageRules": [
+    {
+      "description": "Hold major updates for review: label, soak, and never auto-merge",
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["major"],
+      "minimumReleaseAge": "3 days",
+      "automerge": false
+    },
+    {
+      "description": "Batch GitHub Actions bumps; keep them chore (CI-only, no image change, no release)",
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions",
+      "semanticCommitType": "chore",
+      "semanticCommitScope": "ci"
+    },
+    {
+      "description": "Updates that change the shipped image land as fix(deps) so release-please cuts a release",
+      "matchManagers": ["pip_requirements", "dockerfile"],
+      "semanticCommitType": "fix",
+      "semanticCommitScope": "deps"
+    }
+  ]
+}

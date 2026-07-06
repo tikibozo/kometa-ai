@@ -79,6 +79,9 @@ profile_results.json
 batch_size_optimization.json
 
 # Committed static test fixtures (exceptions to the ignores above)
+!renovate.json
+!release-please-config.json
+!.release-please-manifest.json
 !test_data/synthetic_movies.json
 !test_data/synthetic_collections.json
 
