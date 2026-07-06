@@ -90,16 +90,8 @@ def run_health_check() -> bool:
             logger.error("Missing required API configuration")
             return False
 
-        # Check Claude backend configuration
-        backend = Config.get("CLAUDE_BACKEND", "api").lower()
-        if backend == "cli":
-            import shutil
-            if not shutil.which("claude"):
-                logger.error("CLAUDE_BACKEND=cli but the claude CLI is not on PATH")
-                return False
-            logger.info("Claude CLI found on PATH")
-        elif not Config.get("CLAUDE_API_KEY"):
-            logger.error("CLAUDE_API_KEY is required with CLAUDE_BACKEND=api")
+        # Check Claude backend configuration (same rules the pipeline uses)
+        if make_claude_client() is None:
             return False
 
         # Check Radarr connectivity
@@ -174,6 +166,10 @@ def make_claude_client() -> Optional[Any]:
     model = Config.get("CLAUDE_MODEL")
 
     if backend == "cli":
+        import shutil
+        if not shutil.which("claude"):
+            logger.error("CLAUDE_BACKEND=cli but the claude CLI is not on PATH")
+            return None
         logger.info("Using Claude CLI backend (subscription billing)")
         return ClaudeCliClient(debug_mode=debug_mode, model=model)
 
@@ -550,9 +546,6 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
                 return 0
 
         # Run the main pipeline
-        # Track if this is the first run (for run-now mode)
-        first_run = True
-        
         while not terminate_requested:
             run_start_time = datetime.now()
             formatted_start = run_start_time.strftime("%Y-%m-%d %H:%M:%S")
@@ -580,27 +573,21 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
             logger.info(f"Claude API usage summary: ${total_cost:.4f} spent on {total_requests} requests "
                        f"({total_input_tokens:,} input tokens, {total_output_tokens:,} output tokens)")
 
-            # Calculate next run time for notification
-            notification_run_time = calculate_schedule()
+            # The notification and the sleep must use the same next-run time
+            next_run_time = calculate_schedule()
 
             # Send notifications
             send_notifications(
                 results=results,
                 state_manager=state_manager,
-                next_run_time=notification_run_time
+                next_run_time=next_run_time
             )
 
-            # Exit if termination requested, or if it's the first run in run-now mode
             if terminate_requested:
                 logger.info("Termination requested, exiting")
                 break
-                
-            if args.run_now and first_run:
-                logger.info("Initial run-now execution completed. Switching to scheduled mode.")
-                first_run = False
 
             # Sleep until next run
-            next_run_time = calculate_schedule()
             formatted_next = next_run_time.strftime("%Y-%m-%d %H:%M:%S")
             logger.info(
                 f"Run completed, waiting until next scheduled run at "
@@ -755,7 +742,7 @@ def main(args: Optional[List[str]] = None) -> int:
 
     # Dump configuration if requested
     if parsed_args.dump_config:
-        Config().dump()
+        Config.dump()
         return 0
 
     # State management

@@ -92,7 +92,13 @@ class TestBackendSelection:
     def test_cli_backend(self, monkeypatch):
         monkeypatch.setenv("CLAUDE_BACKEND", "cli")
         monkeypatch.delenv("CLAUDE_API_KEY", raising=False)
-        assert isinstance(make_claude_client(), ClaudeCliClient)
+        with patch("shutil.which", return_value="/usr/local/bin/claude"):
+            assert isinstance(make_claude_client(), ClaudeCliClient)
+
+    def test_cli_backend_requires_binary(self, monkeypatch):
+        monkeypatch.setenv("CLAUDE_BACKEND", "cli")
+        with patch("shutil.which", return_value=None):
+            assert make_claude_client() is None
 
     def test_api_backend_requires_key(self, monkeypatch):
         monkeypatch.setenv("CLAUDE_BACKEND", "api")

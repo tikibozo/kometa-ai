@@ -31,8 +31,9 @@ class Config:
         "TZ": "UTC",
     }
 
-    # Required configuration variables
-    REQUIRED = ["RADARR_URL", "RADARR_API_KEY", "CLAUDE_API_KEY"]
+    # Required configuration variables (Claude auth is backend-dependent
+    # and validated where the client is built)
+    REQUIRED = ["RADARR_URL", "RADARR_API_KEY"]
 
     @staticmethod
     def get(key: str, default: Any = None) -> Any:

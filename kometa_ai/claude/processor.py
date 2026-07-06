@@ -22,6 +22,11 @@ MAX_REVISIONS = 1
 HYSTERESIS_MARGIN = 0.1
 
 
+def is_member(include: bool, confidence: float, threshold: float) -> bool:
+    """The single membership rule: include verdict at or above the threshold."""
+    return include and confidence >= threshold
+
+
 class MovieProcessor:
     """Processes movies for classification using Claude."""
 
@@ -126,12 +131,12 @@ class MovieProcessor:
             excluded_ids = []
 
             for movie_id, decision in existing_decisions.items():
-                if decision.include and decision.confidence >= collection.confidence_threshold:
+                if is_member(decision.include, decision.confidence, collection.confidence_threshold):
                     included_ids.append(movie_id)
                 else:
                     excluded_ids.append(movie_id)
 
-            return included_ids, excluded_ids, {"movie_count": len(movies), "processed": 0, "from_cache": len(existing_decisions)}
+            return included_ids, excluded_ids, {"movie_count": len(movies), "processed_movies": 0, "from_cache": len(existing_decisions)}
 
         # Process in batches
         included_ids = []
@@ -151,7 +156,7 @@ class MovieProcessor:
         for movie in movies:
             if movie.id not in to_process_ids and movie.id in existing_decisions:
                 decision = existing_decisions[movie.id]
-                if decision.include and decision.confidence >= collection.confidence_threshold:
+                if is_member(decision.include, decision.confidence, collection.confidence_threshold):
                     included_ids.append(movie.id)
                 else:
                     excluded_ids.append(movie.id)
@@ -199,7 +204,8 @@ class MovieProcessor:
 
                 # Process decisions
                 batch_included, batch_excluded = self._process_decisions(
-                    response, collection, batch_movies, reprocess_reasons
+                    response, collection, batch_movies, reprocess_reasons,
+                    existing_decisions
                 )
 
                 included_ids.extend(batch_included)
@@ -211,6 +217,14 @@ class MovieProcessor:
                     context=f"collection:{collection.name},batch:{batch_index + 1}",
                     error_message=str(e)
                 )
+                # Preserve existing membership for this batch: without a new
+                # decision, a previously tagged movie would otherwise be
+                # treated as "not included" and lose its tag on an API error
+                for movie in batch_movies:
+                    prior = existing_decisions.get(movie.id)
+                    if prior and is_member(prior.include, prior.confidence,
+                                           collection.confidence_threshold):
+                        included_ids.append(movie.id)
 
         # Store collection-specific stats
         self.collection_stats[collection.name] = all_usage_stats
@@ -231,7 +245,8 @@ class MovieProcessor:
         response: Dict[str, Any],
         collection: CollectionConfig,
         batch_movies: List[Movie],
-        reprocess_reasons: Optional[Dict[int, str]] = None
+        reprocess_reasons: Optional[Dict[int, str]] = None,
+        prior_decisions: Optional[Dict[int, DecisionRecord]] = None
     ) -> Tuple[List[int], List[int]]:
         """Process decisions from Claude's response.
 
@@ -241,6 +256,9 @@ class MovieProcessor:
             batch_movies: List of movies in this batch
             reprocess_reasons: Why each movie was re-evaluated (keyed by movie
                 ID); used for hysteresis and revision accounting
+            prior_decisions: Stored decisions from before this run — the same
+                dict used for prompt anchoring, so hysteresis judges against
+                exactly what Claude was shown
 
         Returns:
             Tuple of (included movie IDs, excluded movie IDs)
@@ -270,14 +288,14 @@ class MovieProcessor:
             # stored decision if it clears the threshold by the hysteresis
             # margin on the opposite side. Otherwise keep the prior call.
             reason = (reprocess_reasons or {}).get(movie_id)
-            prior = self.state_manager.get_decision(movie_id, collection.name)
+            prior = (prior_decisions or {}).get(movie_id)
             threshold = collection.confidence_threshold
             if prior is not None and not self.force_refresh:
                 # Estimated probability the movie belongs, regardless of
                 # which way the include flag points
                 new_score = confidence if include else 1.0 - confidence
-                prior_member = prior.include and prior.confidence >= threshold
-                new_member = include and confidence >= threshold
+                prior_member = is_member(prior.include, prior.confidence, threshold)
+                new_member = is_member(include, confidence, threshold)
                 if prior_member != new_member:
                     flip_allowed = (
                         new_score <= threshold - HYSTERESIS_MARGIN
@@ -319,7 +337,7 @@ class MovieProcessor:
             self.state_manager.set_decision(decision)
 
             # Add to included/excluded lists based on threshold
-            if include and confidence >= collection.confidence_threshold:
+            if is_member(include, confidence, collection.confidence_threshold):
                 included_ids.append(movie_id)
                 logger.debug(
                     f"Including movie {movie_id} ({movie.title}) in collection '{collection.name}' "

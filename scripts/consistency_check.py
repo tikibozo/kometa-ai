@@ -109,7 +109,7 @@ def main() -> int:
             # Bounded re-eval + anchoring + hysteresis should hold membership fixed.
             run3, _, stats3 = evaluate(claude_client, collection, movies, d2)
             changed = run2 ^ run3
-            print(f"Stability pass: {stats3.get('processed_movies', stats3.get('processed', 0))} "
+            print(f"Stability pass: {stats3.get('processed_movies', 0)} "
                   f"movies re-evaluated, {len(changed)} membership changes")
             for movie_id in sorted(changed):
                 print(f"  CHANGED: {by_id.get(movie_id, movie_id)}")

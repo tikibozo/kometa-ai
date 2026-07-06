@@ -148,6 +148,7 @@ class ClaudeCliClient:
         Returns:
             Tuple of (parsed decisions response, usage stats for this request)
         """
+        # Prose twin of client.DECISIONS_SCHEMA — keep the two in sync
         json_instruction = (
             "Respond with ONLY a JSON object — no prose, no markdown fence — in this shape:\n"
             '{"collection_name": "...", "decisions": [{"movie_id": 123, "title": "...", '
