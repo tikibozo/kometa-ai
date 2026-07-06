@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/tikibozo/kometa-ai/compare/v0.2.2...v0.2.3) (2026-07-06)
+
+
+### Bug Fixes
+
+* tolerate a read-only kometa-config mount in the entrypoint ([#7](https://github.com/tikibozo/kometa-ai/issues/7)) ([58a2ade](https://github.com/tikibozo/kometa-ai/commit/58a2ade4684f9b6727b8e0a7caf087c55eb45f72))
+
 ## [0.2.2](https://github.com/tikibozo/kometa-ai/compare/v0.2.1...v0.2.2) (2026-07-06)
 
 
