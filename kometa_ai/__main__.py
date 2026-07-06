@@ -15,6 +15,7 @@ from kometa_ai.utils.logging import setup_logging
 from kometa_ai.utils.scheduling import calculate_next_run_time, sleep_until
 from kometa_ai.radarr.client import RadarrClient
 from kometa_ai.claude.client import ClaudeClient
+from kometa_ai.claude.cli_client import ClaudeCliClient
 from kometa_ai.claude.processor import MovieProcessor
 from kometa_ai.kometa.parser import KometaParser
 from kometa_ai.state.manager import StateManager
@@ -84,10 +85,21 @@ def run_health_check() -> bool:
         # Check required environment variables
         radarr_url = Config.get("RADARR_URL")
         radarr_api_key = Config.get("RADARR_API_KEY")
-        claude_api_key = Config.get("CLAUDE_API_KEY")
 
-        if not all([radarr_url, radarr_api_key, claude_api_key]):
+        if not all([radarr_url, radarr_api_key]):
             logger.error("Missing required API configuration")
+            return False
+
+        # Check Claude backend configuration
+        backend = Config.get("CLAUDE_BACKEND", "api").lower()
+        if backend == "cli":
+            import shutil
+            if not shutil.which("claude"):
+                logger.error("CLAUDE_BACKEND=cli but the claude CLI is not on PATH")
+                return False
+            logger.info("Claude CLI found on PATH")
+        elif not Config.get("CLAUDE_API_KEY"):
+            logger.error("CLAUDE_API_KEY is required with CLAUDE_BACKEND=api")
             return False
 
         # Check Radarr connectivity
@@ -149,9 +161,36 @@ def run_health_check() -> bool:
         return False
 
 
+def make_claude_client() -> Optional[Any]:
+    """Build the configured Claude backend (API key or CLI/subscription).
+
+    Returns:
+        A client exposing classify_movies/get_usage_stats/reset_usage_stats,
+        or None if the backend is misconfigured.
+    """
+    logger = logging.getLogger(__name__)
+    backend = Config.get("CLAUDE_BACKEND", "api").lower()
+    debug_mode = Config.get_bool("DEBUG_LOGGING", False)
+    model = Config.get("CLAUDE_MODEL")
+
+    if backend == "cli":
+        logger.info("Using Claude CLI backend (subscription billing)")
+        return ClaudeCliClient(debug_mode=debug_mode, model=model)
+
+    if backend != "api":
+        logger.error(f"Unknown CLAUDE_BACKEND '{backend}' (expected 'api' or 'cli')")
+        return None
+
+    api_key = Config.get("CLAUDE_API_KEY")
+    if not api_key:
+        logger.error("CLAUDE_API_KEY is required with CLAUDE_BACKEND=api")
+        return None
+    return ClaudeClient(api_key, debug_mode=debug_mode, model=model)
+
+
 def process_collections(
     radarr_client: RadarrClient,
-    claude_client: ClaudeClient,
+    claude_client: Any,
     state_manager: StateManager,
     collections: List[Any],
     all_movies: Optional[List[Any]] = None,
@@ -448,9 +487,8 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
         # Get API configurations
         radarr_url = Config.get("RADARR_URL")
         radarr_api_key = Config.get("RADARR_API_KEY")
-        claude_api_key = Config.get("CLAUDE_API_KEY")
 
-        if not all([radarr_url, radarr_api_key, claude_api_key]):
+        if not all([radarr_url, radarr_api_key]):
             logger.error("Missing required API configuration")
             return 1
 
@@ -463,12 +501,9 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
         logger.info(f"Successfully connected to Radarr at {radarr_url}")
 
         logger.info("Initializing Claude client...")
-        # Get optional model override from config
-        claude_model = Config.get("CLAUDE_MODEL")
-        claude_client = ClaudeClient(
-            claude_api_key, 
-            debug_mode=Config.get_bool("DEBUG_LOGGING", False),
-            model=claude_model)
+        claude_client = make_claude_client()
+        if claude_client is None:
+            return 1
 
         # Parse Kometa configuration
         logger.info("Loading collection configurations...")

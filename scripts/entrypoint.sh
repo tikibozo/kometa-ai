@@ -21,5 +21,10 @@ usermod -o -u "$PUID" kometa
 # Make sure the app directories have the right permissions
 chown -R kometa:kometa /app/kometa-config /app/state /app/logs
 
+# Claude CLI credentials mount (CLAUDE_BACKEND=cli)
+if [ -d /app/.claude ]; then
+    chown -R kometa:kometa /app/.claude
+fi
+
 # Switch to kometa user and run the command
 exec gosu kometa "$@"

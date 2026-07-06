@@ -43,12 +43,13 @@ So I started off giving Claude my Radarr db and the kometa community repo, and a
 
 So that's what this does - give it some interesting collection name/prompt, and it'll figure out which of your movies should be in it. The possibilties are endless!
 
-## This thing costs money, but not like that
-While this project is MIT Licensed open source, **THIS APP REQUIRES A CLAUDE/ANTHROPIC API KEY. YOU'LL HAVE TO SPEND ACTUAL MONEY IN ORDER TO USE IT.** It won't cost much, and there are features designed to minimize costs. But calling into Claude via programmatic means is not free, and is also separate from the chat subscription. The app will report the acutal costs it incurs (which is usually very little per run) though larger libraries will end up costing additional money for new collections as it needs to evaluate each movie for suitability in the collection which is a "# of movies -> cost" scale point. 
+## This thing costs money (unless you have a Claude subscription)
+Kometa-AI supports two Claude backends:
 
-Kometa-AI saves results, so unless you change the collection or movie definition, it won't re-evaluate each movie against each collection on each run. Once the first run of a given collection is completed, it'll just send up new or changed movies for evaluation. 
+- **`CLAUDE_BACKEND=api`** (default): calls the Anthropic API with a `CLAUDE_API_KEY`. This bills per token — it won't cost much (the app reports actual costs per run), but it is real money and separate from a chat subscription. See [Claude Console](https://console.anthropic.com/settings/keys) to create an API key.
+- **`CLAUDE_BACKEND=cli`**: shells out to the [Claude Code CLI](https://claude.com/claude-code) using whatever it's logged in with — typically a Claude subscription, so runs don't bill per token. Build the image with `--build-arg INSTALL_CLAUDE_CLI=true` and mount your Claude credentials directory at `/app/.claude`.
 
-See [Claude Console](https://console.anthropic.com/settings/keys) to sign up/create an API key for use with Kometa-AI.
+Either way, Kometa-AI saves results, so unless you change the collection or movie definition, it won't re-evaluate each movie against each collection on each run. Once the first run of a given collection is completed, it'll just send up new or changed movies for evaluation.
 
 ## Features
 
@@ -105,8 +106,9 @@ services:
 
 - `RADARR_URL`: Base URL for Radarr instance
 - `RADARR_API_KEY`: API key for Radarr authentication
-- `CLAUDE_API_KEY`: API key for Claude AI
-- `CLAUDE_MODEL`: Optional override for Claude model (default: claude-3-7-sonnet-latest)
+- `CLAUDE_BACKEND`: `api` (Anthropic API key, default) or `cli` (Claude Code CLI / subscription)
+- `CLAUDE_API_KEY`: API key for Claude AI (required for the `api` backend)
+- `CLAUDE_MODEL`: Optional override for Claude model (default: claude-sonnet-5)
 - `DEBUG_LOGGING`: Boolean flag to enable detailed logging (default: false)
 - `SMTP_SERVER`: SMTP server address
 - `SMTP_PORT`: SMTP port (default: 25)
@@ -133,9 +135,6 @@ Options:
   --dump-config            Print current configuration and exit
   --dump-state             Print current state file and exit
   --reset-state            Clear state file and start fresh
-  --profile                Enable performance profiling
-  --optimize-batch-size    Run batch size optimization test
-  --memory-profile         Run with detailed memory profiling
   --version                Show version information and exit
   --help                   Show this message and exit
 ```

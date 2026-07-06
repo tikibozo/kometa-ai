@@ -18,7 +18,8 @@ class Config:
     DEFAULTS = {
         "RADARR_URL": None,  # Required
         "RADARR_API_KEY": None,  # Required
-        "CLAUDE_API_KEY": None,  # Required
+        "CLAUDE_API_KEY": None,  # Required for the api backend
+        "CLAUDE_BACKEND": "api",  # "api" (Anthropic API key) or "cli" (claude CLI / subscription)
         "CLAUDE_MODEL": DEFAULT_MODEL,  # Optional: override default Claude model
         "DEBUG_LOGGING": "false",
         "SMTP_SERVER": None,

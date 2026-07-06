@@ -74,6 +74,9 @@ jobs:
         # exit-zero treats all errors as warnings
         flake8 kometa_ai/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics
 
+    - name: Type check with mypy
+      run: mypy kometa_ai
+
   # Build and push Docker images (only on main branch or tags)
   build-and-push:
     name: Build and Push Docker Image

@@ -193,17 +193,9 @@ Measure test coverage with pytest-cov:
 
 ### Radarr Test Environment
 
-For testing with a real Radarr instance:
-
-1. Start the test Radarr environment:
-   ```bash
-   ./run_test_env.sh
-   ```
-
-2. Run automated Radarr tests (includes an option to add sample movies):
-   ```bash
-   ./radarr_test.sh
-   ```
+For testing with a real Radarr instance, point `RADARR_URL`/`RADARR_API_KEY`
+at it and use `--dry-run`, or run `scripts/consistency_check.py --radarr`
+(read-only; no tags are written).
 
 ## Common Commands and Operations
 
@@ -258,16 +250,12 @@ The main application includes built-in performance profiling options:
 
 ```bash
 # Enable performance profiling for a run
-./run_local.sh --run-now --profile
 
 # Save profiling results to a specific file
-./run_local.sh --run-now --profile --profile-output my_profile_results.json
 
 # Run with more detailed memory profiling
-./run_local.sh --run-now --memory-profile
 
 # Run batch size optimization test
-./run_local.sh --optimize-batch-size
 ```
 
 #### Using Test Scripts
@@ -289,10 +277,8 @@ For more detailed performance testing with synthetic data:
 2. Run performance tests:
    ```bash
    # Test with small dataset
-   python test_large_dataset.py -f test_data/small_test.json -b 150
 
    # Test with batch size optimization
-   python test_large_dataset.py -f test_data/medium_test.json --optimize-batch-size
    ```
 
 ### Understanding Profiling Results
@@ -349,25 +335,10 @@ Key metrics to look for:
 
 For best performance with large movie libraries (5,000+ movies):
 
-1. First run with batch size optimization to determine the optimal batch size:
-   ```bash
-   ./run_local.sh --optimize-batch-size
-   ```
-
-2. Take note of the recommended batch size in the output, then run with this size:
-   ```bash
-   ./run_local.sh --run-now --batch-size <optimal_size> --profile
-   ```
-
-3. Review the profiling results to identify bottlenecks:
-   ```bash
-   cat profile_results.json
-   ```
-
-4. Consider these optimization options:
-   - Decrease collection count if processing too many collections
-   - Fine-tune batch size based on your system's memory constraints
-   - Adjust scheduling for less frequent but more optimized runs
+Consider these optimization options:
+- Decrease collection count if processing too many collections
+- Fine-tune batch size (`--batch-size`) based on your system's memory constraints
+- Adjust scheduling for less frequent but more optimized runs
 
 ## Development Best Practices
 
@@ -384,8 +355,8 @@ For best performance with large movie libraries (5,000+ movies):
 - **API Connection Problems**: Verify your API keys and connection URLs
 - **Email Notifications**: Check SMTP settings and try connecting to the server manually
 - **Performance Issues**:
-  - **High Memory Usage**: Try reducing batch size (--batch-size), run with --memory-profile to diagnose
-  - **Slow Processing**: Check collection count, run --optimize-batch-size to find optimal settings
+  - **High Memory Usage**: Try reducing batch size (--batch-size)
+  - **Slow Processing**: Check collection count and batch size
   - **API Failures**: Check for token limits, increase retries in code, implement backoff strategy
   - **Out of Memory Errors**: Ensure your system has enough RAM, reduce collection count, or process collections sequentially
 
