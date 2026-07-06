@@ -72,13 +72,18 @@ class StateManager:
             logger.error(f"Error loading state: {e}")
             self._try_restore_backup()
 
-    def save(self) -> None:
-        """Save state to disk."""
+    def save(self, backup: bool = True) -> None:
+        """Save state to disk.
+
+        Args:
+            backup: Rotate a timestamped backup first. Pass False for
+                mid-run checkpoints so the backup window protects against a
+                bad run rather than rotating away within a single one.
+        """
         try:
             logger.info(f"Saving state to {self.state_file}")
 
-            # Create a backup first
-            if self.state_file.exists():
+            if backup and self.state_file.exists():
                 self._create_backup()
 
             # Update timestamp
@@ -201,32 +206,6 @@ class StateManager:
 
         # Store metadata hash at the movie level if not already there
         movie_decisions['metadata_hash'] = decision.metadata_hash
-
-    def get_decisions_for_movie(self, movie_id: int) -> List[DecisionRecord]:
-        """Get all decisions for a movie.
-
-        Args:
-            movie_id: Movie ID
-
-        Returns:
-            List of decision records
-        """
-        decisions = self.state.get('decisions', {})
-        movie_key = f"movie:{movie_id}"
-
-        if movie_key not in decisions:
-            return []
-
-        collections = decisions[movie_key].get('collections', {})
-        result = []
-
-        for collection_name, decision_data in collections.items():
-            decision_data = decision_data.copy()
-            decision_data['movie_id'] = movie_id
-            decision_data['collection_name'] = collection_name
-            result.append(DecisionRecord.from_dict(decision_data))
-
-        return result
 
     def get_metadata_hash(self, movie_id: int) -> Optional[str]:
         """Get the stored metadata hash for a movie.

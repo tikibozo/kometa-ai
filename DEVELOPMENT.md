@@ -31,11 +31,7 @@ This guide provides comprehensive instructions for setting up, developing, and t
 ### Option 2: Using Docker
 
 1. Make sure Docker and Docker Compose are installed and running
-2. Use the provided Docker development script:
-   ```bash
-   ./docker_dev.sh
-   ```
-   Or use Docker Compose directly:
+2. Use Docker Compose:
    ```bash
    docker-compose -f docker-compose.dev.yml up -d
    ```
@@ -75,7 +71,7 @@ The simplest way to run Kometa-AI is using the helper scripts:
 
 2. For Docker development:
    ```bash
-   ./docker_dev.sh
+   docker-compose -f docker-compose.dev.yml up -d
    ```
 
 ### Manual Execution
@@ -197,30 +193,9 @@ Measure test coverage with pytest-cov:
 
 ### Radarr Test Environment
 
-For testing with a real Radarr instance:
-
-1. Start the test Radarr environment:
-   ```bash
-   ./run_test_env.sh
-   ```
-
-2. Run automated Radarr tests:
-   ```bash
-   ./radarr_test.sh
-   ```
-
-3. Add test movies to Radarr:
-   ```bash
-   python add_test_movies.py
-   ```
-
-### Docker Test Environment
-
-Run the application with the test Docker configuration:
-
-```bash
-docker-compose -f docker-compose.test.yml up -d
-```
+For testing with a real Radarr instance, point `RADARR_URL`/`RADARR_API_KEY`
+at it and use `--dry-run`, or run `scripts/consistency_check.py --radarr`
+(read-only; no tags are written).
 
 ## Common Commands and Operations
 
@@ -263,131 +238,21 @@ NOTIFICATION_RECIPIENTS=user@example.com \
 ./run_local.sh --health-check
 ```
 
-## Performance Testing and Optimization
+## Performance Testing
 
-Kometa-AI includes comprehensive tools for performance testing, profiling, and optimization, particularly for large movie libraries.
-
-### Running Performance Tests
-
-#### Using Command-line Options
-
-The main application includes built-in performance profiling options:
+For measuring decision consistency and evaluating changes against a real or
+synthetic library, use the consistency benchmark:
 
 ```bash
-# Enable performance profiling for a run
-./run_local.sh --run-now --profile
+# Synthetic data
+python generate_test_data.py -n 1000 -o test_data/medium_test.json
+python scripts/consistency_check.py --movies test_data/medium_test.json --config-dir kometa-config
 
-# Save profiling results to a specific file
-./run_local.sh --run-now --profile --profile-output my_profile_results.json
-
-# Run with more detailed memory profiling
-./run_local.sh --run-now --memory-profile
-
-# Run batch size optimization test
-./run_local.sh --optimize-batch-size
+# Or read-only against a live Radarr
+RADARR_URL=... RADARR_API_KEY=... python scripts/consistency_check.py --radarr --config-dir kometa-config --limit 100
 ```
 
-#### Using Test Scripts
-
-For more detailed performance testing with synthetic data:
-
-1. Generate test data:
-   ```bash
-   # Generate a small dataset (50 movies)
-   python generate_test_data.py -n 50 -o test_data/small_test.json
-
-   # Generate a medium dataset (1000 movies)
-   python generate_test_data.py -n 1000 -o test_data/medium_test.json
-
-   # Generate a large dataset (10000 movies)
-   python generate_test_data.py -n 10000 -o test_data/large_test.json
-   ```
-
-2. Run performance tests:
-   ```bash
-   # Test with small dataset
-   python test_large_dataset.py -f test_data/small_test.json -b 150
-
-   # Test memory optimization
-   python test_optimization.py test_data/medium_test.json
-
-   # Test with batch size optimization
-   python test_large_dataset.py -f test_data/medium_test.json --optimize-batch-size
-   ```
-
-### Understanding Profiling Results
-
-Performance profiling results are saved as JSON files with the following structure:
-
-```json
-{
-  "timing": {
-    "total_duration": 120.5,
-    "collection_durations": {...}
-  },
-  "memory": {
-    "peak": {"rss_peak": 256000000, "vms_peak": 512000000},
-    "current": {...},
-    "diff": {...},
-    "top_allocations": [...]
-  },
-  "api_calls": {
-    "claude/messages": {
-      "count": 10,
-      "input_tokens": 80000,
-      "output_tokens": 5000
-    }
-  },
-  "batch_efficiency": {
-    "150": {
-      "count": 8,
-      "total_items": 1200,
-      "efficiency": 0.97
-    }
-  },
-  "collections": {
-    "Film Noir": {
-      "duration": 45.2,
-      "movies_processed": 453,
-      "from_cache": 547,
-      "tokens": {
-        "input": 45300,
-        "output": 2200
-      }
-    }
-  }
-}
-```
-
-Key metrics to look for:
-- **Memory peak**: The maximum memory usage during processing
-- **Total duration**: Overall processing time
-- **Tokens used**: API token usage (affects cost)
-- **Efficiency**: How efficiently batches are utilized
-
-### Optimizing for Large Libraries
-
-For best performance with large movie libraries (5,000+ movies):
-
-1. First run with batch size optimization to determine the optimal batch size:
-   ```bash
-   ./run_local.sh --optimize-batch-size
-   ```
-
-2. Take note of the recommended batch size in the output, then run with this size:
-   ```bash
-   ./run_local.sh --run-now --batch-size <optimal_size> --profile
-   ```
-
-3. Review the profiling results to identify bottlenecks:
-   ```bash
-   cat profile_results.json
-   ```
-
-4. Consider these optimization options:
-   - Decrease collection count if processing too many collections
-   - Fine-tune batch size based on your system's memory constraints
-   - Adjust scheduling for less frequent but more optimized runs
+Per-run cost and token usage are logged at the end of each processing run.
 
 ## Development Best Practices
 
@@ -395,7 +260,6 @@ For best performance with large movie libraries (5,000+ movies):
 2. **Check Coverage**: Aim to maintain or improve the test coverage percentage
 3. **Use Dry Run**: Always test changes with `--dry-run` before applying them to your Radarr library
 4. **Debug Logging**: Enable debug logging with `DEBUG_LOGGING=true` to see detailed operation
-5. **Profile Performance**: Use profiling tools to identify and fix bottlenecks for large libraries
 
 ## Troubleshooting
 
@@ -404,8 +268,8 @@ For best performance with large movie libraries (5,000+ movies):
 - **API Connection Problems**: Verify your API keys and connection URLs
 - **Email Notifications**: Check SMTP settings and try connecting to the server manually
 - **Performance Issues**:
-  - **High Memory Usage**: Try reducing batch size (--batch-size), run with --memory-profile to diagnose
-  - **Slow Processing**: Check collection count, run --optimize-batch-size to find optimal settings
+  - **High Memory Usage**: Try reducing batch size (--batch-size)
+  - **Slow Processing**: Check collection count and batch size
   - **API Failures**: Check for token limits, increase retries in code, implement backoff strategy
   - **Out of Memory Errors**: Ensure your system has enough RAM, reduce collection count, or process collections sequentially
 

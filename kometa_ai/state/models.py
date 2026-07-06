@@ -15,6 +15,10 @@ class DecisionRecord:
     tag: str
     timestamp: str  # ISO format
     reasoning: Optional[str] = None
+    # Number of near-threshold re-evaluations this decision has consumed.
+    # Once it reaches the processor's max_revisions, only a metadata change
+    # or --force-refresh triggers another evaluation.
+    revisions: int = 0
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'DecisionRecord':
@@ -34,7 +38,8 @@ class DecisionRecord:
             metadata_hash=data.get('metadata_hash', ''),
             tag=data.get('tag', ''),
             timestamp=data.get('timestamp', datetime.now(UTC).isoformat()),
-            reasoning=data.get('reasoning')
+            reasoning=data.get('reasoning'),
+            revisions=data.get('revisions', 0)
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -55,5 +60,8 @@ class DecisionRecord:
 
         if self.reasoning:
             result['reasoning'] = self.reasoning
+
+        if self.revisions:
+            result['revisions'] = self.revisions
 
         return result

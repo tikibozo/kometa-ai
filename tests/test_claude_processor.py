@@ -54,9 +54,8 @@ class TestPrompts:
         assert "film expert" in system_prompt
         assert "categorizing movies" in system_prompt
         assert "Guidelines:" in system_prompt
-        assert "JSON format" in system_prompt
-        assert "collection_name" in system_prompt
-        assert "decisions" in system_prompt
+        assert "independently" in system_prompt
+        assert "previous_decision" in system_prompt
         assert "confidence" in system_prompt
     
     def test_collection_prompt(self):

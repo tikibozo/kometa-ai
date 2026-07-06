@@ -286,7 +286,7 @@ class MockClaudeClient(ClaudeClient):
     def test_connection(self):
         return True
     
-    def classify_movies(self, system_prompt, collection_prompt, movies_data, batch_size=None):
+    def classify_movies(self, system_prompt, collection_prompt, movies_data):
         # Extract collection name from prompt
         import re
         match = re.search(r'categorize movies for the "(.*?)" collection', collection_prompt)
@@ -307,8 +307,10 @@ class MockClaudeClient(ClaudeClient):
         self._cost_tracking['total_output_tokens'] += 500
         self._cost_tracking['total_cost'] += 0.02
         self._cost_tracking['requests'] += 1
-        
-        return response, self.get_usage_stats()
+
+        per_request = {'total_input_tokens': 2000, 'total_output_tokens': 500,
+                       'total_cost': 0.02, 'requests': 1}
+        return response, per_request
     
     def get_usage_stats(self):
         stats = self._cost_tracking.copy()
@@ -325,7 +327,8 @@ class TestClaudeClient:
         client = ClaudeClient(api_key="test_key", debug_mode=True)
         assert client.api_key == "test_key"
         assert client.debug_mode is True
-        assert client.model == "claude-3-5-sonnet-20240620"
+        from kometa_ai.claude.client import DEFAULT_MODEL
+        assert client.model == DEFAULT_MODEL
         
         # Check cost tracking initialization
         stats = client.get_usage_stats()
@@ -364,39 +367,6 @@ class TestClaudeClient:
         assert stats["total_output_tokens"] == 1000
         assert stats["requests"] == 2
     
-    def test_json_parsing(self):
-        """Test JSON response parsing with different formats."""
-        client = ClaudeClient(api_key="test_key")
-        
-        # Valid JSON
-        json_str = '{"collection_name": "Test", "decisions": [{"movie_id": 1, "include": true}]}'
-        result = client._parse_json_response(json_str)
-        assert result["collection_name"] == "Test"
-        assert result["decisions"][0]["movie_id"] == 1
-        
-        # JSON in code block
-        markdown_json = '```json\n{"collection_name": "Test", "decisions": [{"movie_id": 2, "include": false}]}\n```'
-        result = client._parse_json_response(markdown_json)
-        assert result["collection_name"] == "Test"
-        assert result["decisions"][0]["movie_id"] == 2
-        
-        # JSON with surrounding text
-        text_json = 'Here is the result:\n\n{"collection_name": "Test", "decisions": [{"movie_id": 3, "include": true}]}\n\nHope this helps!'
-        result = client._parse_json_response(text_json)
-        assert result["collection_name"] == "Test"
-        assert result["decisions"][0]["movie_id"] == 3
-        
-        # JSON with comments (which are invalid in standard JSON)
-        commented_json = '{\n"collection_name": "Test", // The collection name\n"decisions": [\n{"movie_id": 4, "include": true} // Include this movie\n]\n}'
-        # This would normally fail with json.loads, but our parser should handle it
-        try:
-            result = client._parse_json_response(commented_json)
-            assert result["collection_name"] == "Test"
-            assert result["decisions"][0]["movie_id"] == 4
-        except ValueError:
-            # If it fails, that's okay - it's an edge case our parser might improve on
-            pass
-
 
 class TestClaudeIntegration:
     @pytest.fixture
@@ -427,7 +397,7 @@ class TestClaudeIntegration:
         # Test system prompt
         system_prompt = get_system_prompt()
         assert "film expert" in system_prompt
-        assert "JSON format" in system_prompt
+        assert "independently" in system_prompt
         
         # Test collection prompt
         collection_prompt = format_collection_prompt(collections[0])

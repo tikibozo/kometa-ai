@@ -1,9 +1,10 @@
 import logging
 import json
-from typing import Dict, List, Any
+from typing import Dict, List, Optional
 
 from kometa_ai.radarr.models import Movie
 from kometa_ai.kometa.models import CollectionConfig
+from kometa_ai.state.models import DecisionRecord
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +21,10 @@ You are a film expert tasked with categorizing movies for a Plex media server. Y
 Guidelines:
 1. Focus ONLY on the specific collection definition and criteria provided
 2. Consider all relevant movie attributes (title, year, genres, plot, directors, actors, etc.)
-3. Apply the collection criteria consistently across all movies
-4. Provide a confidence score (0.0-1.0) for each decision
-5. Include reasoning ONLY for borderline cases (confidence between 0.4-0.8)
-6. Return answers in valid JSON format only
-7. Do not consider personal preferences or subjective quality judgments
+3. Evaluate each movie independently against the criteria — never relative to the other movies in the list. The list you receive is an arbitrary slice of the library, and the same movie must get the same verdict regardless of which other movies happen to appear alongside it.
+4. For each movie, reason briefly about the fit FIRST (the reasoning field), then commit to include and confidence. Keep reasoning to a sentence or two; it matters most for borderline cases.
+5. Provide a confidence score (0.0-1.0) for each decision: your confidence in the include/exclude call you made
+6. Do not consider personal preferences or subjective quality judgments
 
 When evaluating movies:
 - Be objective and follow the criteria exactly
@@ -36,28 +36,14 @@ When evaluating movies:
 - Be cautious about superficial similarities and lookout for mismatches between overview and actual film content
 - Be discriminating: a movie containing elements of a genre doesn't necessarily mean it belongs in that collection
 - Consider the movie's primary themes and genres, not incidental elements
+- The "keywords" field contains community-sourced tags: useful signals for themes and subject matter, but not verdicts — a movie tagged "heist" is not necessarily a heist movie
 
 IMPORTANT: For collections based on themes or genres, focus on whether the movie is primarily about that theme/genre, not whether it contains elements of it. For example:
 - A movie with one heist scene is not necessarily a "Heist Movie"
-- A movie set partly in space is not necessarily a "Space Movie" 
+- A movie set partly in space is not necessarily a "Space Movie"
 - A movie with some comedy is not necessarily a "Comedy Movie"
 
-Your response must follow this exact JSON format:
-{
-  "collection_name": "Name of the collection",
-  "decisions": [
-    {
-      "movie_id": 123,
-      "title": "Movie Title",
-      "include": true,
-      "confidence": 0.95,
-      "reasoning": "Optional explanation for borderline cases"
-    },
-    // Additional movies...
-  ]
-}
-
-IMPORTANT: Return valid JSON only. Do not include markdown formatting or explanatory text outside the JSON structure.
+PREVIOUS DECISIONS: Some movies carry a "previous_decision" field from an earlier evaluation of this same collection. Treat it as the standing verdict: keep it unless you have a clear, articulable reason the movie was misclassified. Do not flip a previous decision based on a marginally different reading of the same evidence — consistency across runs matters more than second-guessing borderline calls. If you do flip one, state the reason in the reasoning field.
 """
 
 
@@ -70,28 +56,12 @@ def format_collection_prompt(collection: CollectionConfig) -> str:
     Returns:
         Formatted prompt
     """
-    # Log the collection configuration for debugging
-    logger.debug(f"Processing collection: {collection.name}")
-    logger.debug(f"Collection prompt (type: {type(collection.prompt)}): {repr(collection.prompt)}")
-    logger.debug(f"Collection enabled: {collection.enabled}")
-    logger.debug(f"Collection confidence: {collection.confidence_threshold}")
-
-    # Ensure the prompt is properly formatted
     formatted_prompt = collection.prompt.strip() if collection.prompt else ""
 
-    # Check for blank prompt
     if not formatted_prompt:
         logger.warning(f"Collection '{collection.name}' has an empty prompt!")
 
-    # More detailed logging for prompt content inspection
-    logger.debug(f"Prompt content before formatting (length: {len(formatted_prompt)}):")
-    if formatted_prompt:
-        # Log each line for debugging bullet points
-        for i, line in enumerate(formatted_prompt.split('\n')):
-            logger.debug(f"  Prompt line {i}: '{line}'")
-
-    # Create the formatted prompt template
-    prompt_template = f"""
+    return f"""
 I need you to categorize movies for the "{collection.name}" collection.
 
 COLLECTION DEFINITION AND CRITERIA:
@@ -107,36 +77,26 @@ IMPORTANT CONSIDERATIONS FOR THIS COLLECTION:
 - Focus on the movie's primary themes and content, not secondary elements
 - When evaluating movies, use your knowledge of cinema to supplement the data provided
 - Consider whether a typical viewer would categorize this movie primarily as a {collection.name.rstrip('s')} film
-
-Return your evaluation in the required JSON format ONLY, with no additional text or explanations outside the JSON structure.
 """
 
-    # Log the final formatted prompt for verification
-    logger.debug(f"Final formatted prompt length: {len(prompt_template)}")
-    logger.debug(f"First 100 chars: {prompt_template[:100]}")
-    logger.debug(f"Section with bullet points check: {'-' in formatted_prompt}")
-    logger.debug(f"Section with criteria: {'COLLECTION DEFINITION AND CRITERIA:' in prompt_template}")
 
-    # Log the exact content being sent to Claude
-    logger.debug("PROMPT CONTENT START >>>")
-    logger.debug(prompt_template)
-    logger.debug("<<< PROMPT CONTENT END")
-
-    return prompt_template
-
-
-def format_movies_data(movies: List[Movie]) -> str:
+def format_movies_data(
+    movies: List[Movie],
+    prior_decisions: Optional[Dict[int, DecisionRecord]] = None
+) -> str:
     """Format movie data for Claude prompt.
 
     Args:
         movies: List of movies
+        prior_decisions: Previous decisions for this collection keyed by movie
+            ID; included so Claude can anchor re-evaluations to the standing
+            verdict
 
     Returns:
-        Formatted movie data
+        Formatted movie data as JSON
     """
     movies_data = []
     for movie in movies:
-        # Create basic movie data
         movie_data = {
             "movie_id": movie.id,
             "title": movie.title,
@@ -145,7 +105,16 @@ def format_movies_data(movies: List[Movie]) -> str:
             "overview": movie.overview,
         }
 
-        # Add optional metadata if available
+        if movie.keywords:
+            movie_data["keywords"] = movie.keywords
+        if movie.certification:
+            movie_data["certification"] = movie.certification
+        if movie.original_language:
+            movie_data["original_language"] = movie.original_language
+        if movie.imdb_rating:
+            movie_data["imdb_rating"] = movie.imdb_rating
+        if movie.rotten_tomatoes:
+            movie_data["rotten_tomatoes_pct"] = movie.rotten_tomatoes
         if movie.imdb_id:
             movie_data["imdb_id"] = movie.imdb_id
         if movie.tmdb_id:
@@ -163,7 +132,13 @@ def format_movies_data(movies: List[Movie]) -> str:
         if movie.collection and 'name' in movie.collection:
             movie_data["collection"] = movie.collection.get('name')
 
+        prior = (prior_decisions or {}).get(movie.id)
+        if prior is not None:
+            movie_data["previous_decision"] = {
+                "include": prior.include,
+                "confidence": prior.confidence,
+            }
+
         movies_data.append(movie_data)
 
-    # Return proper JSON string instead of Python string representation
     return json.dumps(movies_data, indent=2)

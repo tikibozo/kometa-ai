@@ -37,8 +37,8 @@ logs/
 *.log
 
 
-# Test data
-test_data/
+# Test data (generated); static fixtures are un-ignored below
+test_data/*
 old_scripts/
 fix_*.py
 test_parser.py
@@ -78,5 +78,10 @@ optimization_results_*.json
 profile_results.json
 batch_size_optimization.json
 
+# Committed static test fixtures (exceptions to the ignores above)
+!test_data/synthetic_movies.json
+!test_data/synthetic_collections.json
+
 # Claude settings
 **/.claude/settings.local.json
+docker-compose.test.yml

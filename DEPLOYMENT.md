@@ -163,7 +163,9 @@ If you need to build the image yourself:
 |----------|-------------|---------|----------|
 | `RADARR_URL` | Base URL for Radarr instance | | Yes |
 | `RADARR_API_KEY` | API key for Radarr | | Yes |
-| `CLAUDE_API_KEY` | API key for Claude AI | | Yes |
+| `CLAUDE_BACKEND` | `api` (API key) or `cli` (Claude Code CLI / subscription) | `api` | No |
+| `CLAUDE_API_KEY` | API key for Claude AI | | With `api` backend |
+| `CLAUDE_MODEL` | Claude model override | `claude-sonnet-5` | No |
 | `SCHEDULE_INTERVAL` | Interval between runs (e.g., "1h", "1d", "1w", "1mo") | "1d" | No |
 | `SCHEDULE_START_TIME` | Start time in 24hr format (e.g., "03:00") | "03:00" | No |
 | `TZ` | Time zone for scheduling | UTC | No |
@@ -468,7 +470,6 @@ docker exec kometa-ai python -m kometa_ai --run-now --collection "Film Noir" --d
 Kometa-AI includes a batch size optimization tool to determine the optimal settings for your specific environment:
 
 ```bash
-docker exec kometa-ai python -m kometa_ai --optimize-batch-size
 ```
 
 ## Integration with Kometa

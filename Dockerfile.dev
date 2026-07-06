@@ -32,9 +32,6 @@ ENV TZ=UTC \
     PUID=1000 \
     PGID=1000
 
-# Use watchdog for auto-reloading during development
-RUN pip install watchdog[watchmedo]
-
 # Copy entrypoint script
 COPY scripts/entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/entrypoint.sh

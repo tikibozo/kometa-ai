@@ -1,15 +1,16 @@
 import os
 import json
 import logging
-from typing import Dict, Any, Optional, Union, List
-from datetime import datetime
+from typing import Any, Optional, List
+
+from kometa_ai.claude.client import DEFAULT_MODEL
 
 logger = logging.getLogger(__name__)
 
 class Config:
     """Configuration manager for Kometa-AI.
 
-    Loads configuration from environment variables and provides
+    Reads configuration from environment variables and provides
     access to configuration values with defaults.
     """
 
@@ -17,8 +18,9 @@ class Config:
     DEFAULTS = {
         "RADARR_URL": None,  # Required
         "RADARR_API_KEY": None,  # Required
-        "CLAUDE_API_KEY": None,  # Required
-        "CLAUDE_MODEL": "claude-3-7-sonnet-latest",  # Optional: override default Claude model
+        "CLAUDE_API_KEY": None,  # Required for the api backend
+        "CLAUDE_BACKEND": "api",  # "api" (Anthropic API key) or "cli" (claude CLI / subscription)
+        "CLAUDE_MODEL": DEFAULT_MODEL,  # Optional: override default Claude model
         "DEBUG_LOGGING": "false",
         "SMTP_SERVER": None,
         "SMTP_PORT": "25",
@@ -29,14 +31,9 @@ class Config:
         "TZ": "UTC",
     }
 
-    # Required configuration variables
-    REQUIRED = ["RADARR_URL", "RADARR_API_KEY", "CLAUDE_API_KEY"]
-
-    def __init__(self):
-        """Initialize configuration from environment variables."""
-        self.config = {}
-        self._load_from_env()
-        self._validate()
+    # Required configuration variables (Claude auth is backend-dependent
+    # and validated where the client is built)
+    REQUIRED = ["RADARR_URL", "RADARR_API_KEY"]
 
     @staticmethod
     def get(key: str, default: Any = None) -> Any:
@@ -106,38 +103,19 @@ class Config:
 
         return [item.strip() for item in value.split(",")]
 
-    def _load_from_env(self) -> None:
-        """Load configuration from environment variables."""
-        for key in self.DEFAULTS.keys():
-            self.config[key] = self.get(key)
-
-    def _validate(self) -> None:
-        """Validate required configuration values are present."""
-        missing = []
-        for key in self.REQUIRED:
-            if not self.config.get(key):
-                missing.append(key)
-
-        if missing:
-            logger.error(f"Missing required configuration: {', '.join(missing)}")
-            # Don't raise an exception, just log the error
-
-    def dump(self) -> None:
+    @staticmethod
+    def dump() -> None:
         """Print the current configuration (with sensitive values masked)."""
-        # Create a copy to mask sensitive values
         display_config = {}
-        for key, value in self.config.items():
+        for key in Config.DEFAULTS:
+            value = Config.get(key)
             if key.endswith(("API_KEY", "PASSWORD", "SECRET")):
                 display_config[key] = "********" if value else None
             else:
                 display_config[key] = value
 
+        missing = [key for key in Config.REQUIRED if not Config.get(key)]
+        if missing:
+            logger.error(f"Missing required configuration: {', '.join(missing)}")
+
         print(json.dumps(display_config, indent=2))
-
-    def as_dict(self) -> Dict[str, Any]:
-        """Get configuration as a dictionary.
-
-        Returns:
-            Dictionary of configuration values
-        """
-        return self.config.copy()

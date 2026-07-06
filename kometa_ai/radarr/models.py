@@ -1,12 +1,13 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 
-from kometa_ai.common.models import Tag as BaseTag, MediaItem as BaseMediaItem
-
 
 @dataclass
-class Tag(BaseTag):
+class Tag:
     """Radarr tag model."""
+
+    id: int
+    label: str
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Tag':
@@ -25,13 +26,15 @@ class Tag(BaseTag):
 
 
 @dataclass
-class Movie(BaseMediaItem):
+class Movie:
     """Radarr movie model.
 
-    This represents a movie in Radarr. Note that for Stage 1, we're only
-    implementing a read-only subset of the fields that are relevant for
-    movie categorization and tag management.
+    A read-only subset of the fields relevant for movie categorization and
+    tag management.
     """
+
+    id: int
+    title: str
 
     # Optional metadata fields
     original_title: Optional[str] = None
@@ -42,28 +45,38 @@ class Movie(BaseMediaItem):
     overview: Optional[str] = None
     runtime: Optional[int] = None  # Minutes
     genres: List[str] = field(default_factory=list)
+    keywords: List[str] = field(default_factory=list)
     studio: Optional[str] = None
+    certification: Optional[str] = None
+    original_language: Optional[str] = None
+    # Prompt-only signals: these drift over time, so they are deliberately
+    # excluded from the metadata hash to avoid re-evaluation churn
+    imdb_rating: Optional[float] = None
+    rotten_tomatoes: Optional[int] = None
 
     # Status fields
     status: Optional[str] = None  # released, announced, etc.
     monitored: bool = True
-    has_file: bool = False
 
     # Tag management
     tag_ids: List[int] = field(default_factory=list)
 
     # File system fields
     path: Optional[str] = None
-    folder_name: Optional[str] = None
-    size_on_disk: Optional[int] = None
 
     # Additional metadata
     quality_profile_id: Optional[int] = None
-    added: Optional[str] = None  # ISO date
-    ratings: Dict[str, Any] = field(default_factory=dict)
     youtube_trailer_id: Optional[str] = None
     collection: Dict[str, Any] = field(default_factory=dict)
     alternative_titles: List[Dict[str, Any]] = field(default_factory=list)
+
+    @staticmethod
+    def _rating(data: Dict[str, Any], source: str, ndigits: int = 0, as_int: bool = False):
+        """Extract one rating value from Radarr's ratings blob, rounded."""
+        value = ((data.get('ratings') or {}).get(source) or {}).get('value')
+        if value is None or value == 0:
+            return None
+        return int(round(value)) if as_int else round(value, ndigits)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Movie':
@@ -86,17 +99,17 @@ class Movie(BaseMediaItem):
             overview=data.get('overview'),
             runtime=data.get('runtime'),
             genres=data.get('genres', []),
+            keywords=data.get('keywords', []),
             tag_ids=data.get('tags', []),
             studio=data.get('studio'),
+            certification=data.get('certification'),
+            original_language=(data.get('originalLanguage') or {}).get('name'),
+            imdb_rating=cls._rating(data, 'imdb', ndigits=1),
+            rotten_tomatoes=cls._rating(data, 'rottenTomatoes', as_int=True),
             quality_profile_id=data.get('qualityProfileId'),
             monitored=data.get('monitored', True),
             status=data.get('status'),
-            added=data.get('added'),
-            ratings=data.get('ratings', {}),
             path=data.get('path'),
-            folder_name=data.get('folderName'),
-            size_on_disk=data.get('sizeOnDisk'),
-            has_file=data.get('hasFile', False),
             youtube_trailer_id=data.get('youTubeTrailerId'),
             collection=data.get('collection', {}),
             alternative_titles=data.get('alternativeTitles', [])
@@ -147,6 +160,9 @@ class Movie(BaseMediaItem):
             'year': self.year,
             'overview': self.overview,
             'genres': sorted(self.genres),
+            'keywords': sorted(self.keywords),
+            'certification': self.certification,
+            'original_language': self.original_language,
             'studio': self.studio,
             'youtube_trailer_id': self.youtube_trailer_id,
             'alternative_titles': sorted(

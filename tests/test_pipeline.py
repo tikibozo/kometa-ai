@@ -129,7 +129,7 @@ class MockClaudeClient(ClaudeClient):
     def test_connection(self):
         return self.test_connection_result
     
-    def classify_movies(self, system_prompt, collection_prompt, movies_data, batch_size=None):
+    def classify_movies(self, system_prompt, collection_prompt, movies_data):
         # Extract collection name from prompt
         import re
         match = re.search(r'categorize movies for the "(.*?)" collection', collection_prompt)
@@ -146,8 +146,10 @@ class MockClaudeClient(ClaudeClient):
         self._cost_tracking['total_output_tokens'] += 500
         self._cost_tracking['total_cost'] += 0.01
         self._cost_tracking['requests'] += 1
-        
-        return mock_response, self.get_usage_stats()
+
+        per_request = {'total_input_tokens': 1000, 'total_output_tokens': 500,
+                       'total_cost': 0.01, 'requests': 1}
+        return mock_response, per_request
     
     def get_usage_stats(self):
         stats = self._cost_tracking.copy()
@@ -344,7 +346,6 @@ class TestEndToEndPipeline:
             state_manager=state_manager,
             collections=collections,
             dry_run=False,
-            batch_size=None,
             force_refresh=True
         )
         
@@ -618,13 +619,13 @@ class TestEndToEndPipeline:
         
     def test_tag_mismatch_correction_in_pipeline(self, test_env, monkeypatch):
         """Test that tag mismatches are auto-fixed in the pipeline when enabled."""
-        # Access the parser and files
-        parser = test_env["parser"]
         config_dir = test_env["config_dir"]
-        
-        # Enable auto-fix
+
+        # Enable auto-fix; the parser reads the env var at construction time
         monkeypatch.setenv('KOMETA_FIX_TAGS', 'true')
-        
+        from kometa_ai.kometa.parser import KometaParser
+        parser = KometaParser(str(config_dir))
+
         # Process the yaml files
         files = parser.find_yaml_files()
         blocks = parser.extract_ai_blocks(files[0])
