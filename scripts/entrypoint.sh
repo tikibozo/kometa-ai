@@ -21,7 +21,10 @@ usermod -o -u "$PUID" kometa
 # Make sure the app directories have the right permissions. /app itself must
 # be writable so the claude CLI (CLAUDE_BACKEND=cli) can create ~/.claude.json
 chown kometa:kometa /app
-chown -R kometa:kometa /app/kometa-config /app/state /app/logs
+chown -R kometa:kometa /app/state /app/logs
+# The kometa-config mount may be read-only (tag fixing disabled); chown is
+# best-effort — read access just needs a compatible PUID/PGID
+chown -R kometa:kometa /app/kometa-config 2>/dev/null || true
 
 # Claude CLI credentials mount (CLAUDE_BACKEND=cli)
 if [ -d /app/.claude ]; then
