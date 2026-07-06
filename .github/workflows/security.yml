@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Scan tikibozo/kometa-ai:latest
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: tikibozo/kometa-ai:latest
           severity: HIGH,CRITICAL
