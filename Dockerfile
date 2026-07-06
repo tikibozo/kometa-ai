@@ -66,15 +66,9 @@ ENV TZ=UTC \
     PUID=1000 \
     PGID=1000
 
-# Optionally bake in the Claude Code CLI for CLAUDE_BACKEND=cli
-# (subscription billing). Build with: --build-arg INSTALL_CLAUDE_CLI=true
-# At runtime, mount your Claude credentials at /app/.claude
-ARG INSTALL_CLAUDE_CLI=false
-RUN if [ "$INSTALL_CLAUDE_CLI" = "true" ]; then \
-      HOME=/app bash -c "curl -fsSL https://claude.ai/install.sh | bash" \
-      && ln -sf /app/.local/bin/claude /usr/local/bin/claude \
-      && chown -R kometa:kometa /app/.local; \
-    fi
+# The Claude Code CLI (CLAUDE_BACKEND=cli, subscription billing) is not baked
+# in — the entrypoint downloads it on first start when that backend is
+# selected, keeping the image small. Mount credentials at /app/.claude.
 
 # Copy entrypoint script
 COPY scripts/entrypoint.sh /usr/local/bin/
