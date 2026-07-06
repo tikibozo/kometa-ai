@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Adventure Films",
+    "description": "Movies focused on exciting journeys, quests, and exploration.",
+    "criteria": "Movies with adventure themes, often featuring quests, journeys, or exploration into unknown territories.",
+    "tag": "adventure-films",
+    "enabled": true
+  },
+  {
+    "name": "Mystery Thrillers",
+    "description": "Suspenseful movies with mystery elements.",
+    "criteria": "Films that combine mystery and thriller elements, featuring investigations, suspense, and plot twists.",
+    "tag": "mystery-thrillers",
+    "enabled": true
+  },
+  {
+    "name": "Comedy Collection",
+    "description": "Funny movies to lighten the mood.",
+    "criteria": "Movies intended to make the audience laugh through humor, amusing situations, and comedy.",
+    "tag": "comedy-collection",
+    "enabled": true
+  }
+]

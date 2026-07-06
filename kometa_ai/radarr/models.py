@@ -1,12 +1,13 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 
-from kometa_ai.common.models import Tag as BaseTag, MediaItem as BaseMediaItem
-
 
 @dataclass
-class Tag(BaseTag):
+class Tag:
     """Radarr tag model."""
+
+    id: int
+    label: str
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Tag':
@@ -25,13 +26,15 @@ class Tag(BaseTag):
 
 
 @dataclass
-class Movie(BaseMediaItem):
+class Movie:
     """Radarr movie model.
 
-    This represents a movie in Radarr. Note that for Stage 1, we're only
-    implementing a read-only subset of the fields that are relevant for
-    movie categorization and tag management.
+    A read-only subset of the fields relevant for movie categorization and
+    tag management.
     """
+
+    id: int
+    title: str
 
     # Optional metadata fields
     original_title: Optional[str] = None
@@ -47,20 +50,15 @@ class Movie(BaseMediaItem):
     # Status fields
     status: Optional[str] = None  # released, announced, etc.
     monitored: bool = True
-    has_file: bool = False
 
     # Tag management
     tag_ids: List[int] = field(default_factory=list)
 
     # File system fields
     path: Optional[str] = None
-    folder_name: Optional[str] = None
-    size_on_disk: Optional[int] = None
 
     # Additional metadata
     quality_profile_id: Optional[int] = None
-    added: Optional[str] = None  # ISO date
-    ratings: Dict[str, Any] = field(default_factory=dict)
     youtube_trailer_id: Optional[str] = None
     collection: Dict[str, Any] = field(default_factory=dict)
     alternative_titles: List[Dict[str, Any]] = field(default_factory=list)
@@ -91,12 +89,7 @@ class Movie(BaseMediaItem):
             quality_profile_id=data.get('qualityProfileId'),
             monitored=data.get('monitored', True),
             status=data.get('status'),
-            added=data.get('added'),
-            ratings=data.get('ratings', {}),
             path=data.get('path'),
-            folder_name=data.get('folderName'),
-            size_on_disk=data.get('sizeOnDisk'),
-            has_file=data.get('hasFile', False),
             youtube_trailer_id=data.get('youTubeTrailerId'),
             collection=data.get('collection', {}),
             alternative_titles=data.get('alternativeTitles', [])

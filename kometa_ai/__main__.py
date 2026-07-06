@@ -13,7 +13,6 @@ from kometa_ai.__version__ import __version__
 from kometa_ai.config import Config
 from kometa_ai.utils.logging import setup_logging
 from kometa_ai.utils.scheduling import calculate_next_run_time, sleep_until
-from kometa_ai.utils.profiling import profiler, profile_time
 from kometa_ai.radarr.client import RadarrClient
 from kometa_ai.claude.client import ClaudeClient
 from kometa_ai.claude.processor import MovieProcessor
@@ -40,12 +39,6 @@ def setup_signal_handlers():
     """Set up signal handlers for graceful termination."""
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-
-    # Windows doesn't support SIGUSR1, etc.
-    try:
-        signal.signal(signal.SIGUSR1, signal_handler)
-    except AttributeError:
-        pass
 
 
 def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
@@ -76,21 +69,6 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--version", action="store_true",
                         help="Show version information and exit")
 
-    # Performance profiling options
-    performance_group = parser.add_argument_group('Performance Options')
-    performance_group.add_argument("--profile", action="store_true",
-                                   help="Enable performance profiling")
-    performance_group.add_argument(
-        "--profile-output", type=str,
-        help=("File to save profiling data "
-              "(default: profile_results.json)"))
-    performance_group.add_argument(
-        "--optimize-batch-size", action="store_true",
-        help="Run batch size optimization test")
-    performance_group.add_argument(
-        "--memory-profile", action="store_true",
-        help="Run with detailed memory profiling")
-
     return parser.parse_args(args)
 
 
@@ -120,13 +98,6 @@ def run_health_check() -> bool:
             return False
         logger.info("Successfully connected to Radarr API")
 
-        # Check Claude connectivity
-        logger.info("Checking Claude API connectivity...")
-        claude_client = ClaudeClient(claude_api_key)
-        if not claude_client.test_connection():
-            logger.error("Failed to connect to Claude API")
-            return False
-        logger.info("Successfully connected to Claude API")
 
         # Check Kometa configuration
         logger.info("Checking Kometa configuration...")
@@ -178,7 +149,6 @@ def run_health_check() -> bool:
         return False
 
 
-@profile_time
 def process_collections(
     radarr_client: RadarrClient,
     claude_client: ClaudeClient,
@@ -187,8 +157,7 @@ def process_collections(
     all_movies: Optional[List[Any]] = None,
     dry_run: bool = False,
     batch_size: Optional[int] = None,
-    force_refresh: bool = False,
-    enable_profiling: bool = False
+    force_refresh: bool = False
 ) -> Dict[str, Any]:
     """Process all collections and apply tag changes.
 
@@ -201,16 +170,11 @@ def process_collections(
         dry_run: If True, don't apply changes
         batch_size: Override default batch size
         force_refresh: Force reprocessing of all movies
-        enable_profiling: Enable detailed performance profiling
 
     Returns:
         Dictionary with processing results and statistics
     """
     logger = logging.getLogger(__name__)
-
-    # Start profiling if enabled
-    if enable_profiling:
-        profiler.start()
 
     # Use provided movies or fetch them if not provided
     if all_movies is None:
@@ -258,10 +222,6 @@ def process_collections(
             f"Processing collection '{collection.name}'...")
 
         try:
-            # Mark collection start for profiling
-            if enable_profiling:
-                profiler.mark_collection_start(collection.name)
-
             # Classify movies for this collection
             logger.info(
                 f"Classifying movies for '{collection.name}' "
@@ -322,10 +282,6 @@ def process_collections(
             results["collections_processed"] = cast(int, results["collections_processed"]) + 1
             results["movies_processed"] = cast(int, results["movies_processed"]) + stats.get("processed_movies", 0)
 
-            # Mark collection end for profiling
-            if enable_profiling:
-                profiler.mark_collection_end(collection.name, stats)
-
         except Exception as e:
             error_msg = (
                 f"Error processing collection '{collection.name}': {str(e)}"
@@ -347,11 +303,6 @@ def process_collections(
 
     # Save state with all changes and errors
     state_manager.save()
-
-    # Stop profiling if enabled and store the results
-    if enable_profiling:
-        profiling_results = profiler.stop()
-        results["profiling"] = profiling_results
 
     # Generate summary with more details
     error_count = len(results['errors'])
@@ -476,7 +427,6 @@ def calculate_schedule() -> datetime:
     return next_run
 
 
-@profile_time
 def run_scheduled_pipeline(args: argparse.Namespace) -> int:
     """Run the core processing pipeline with scheduling.
 
@@ -504,45 +454,13 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
             logger.error("Missing required API configuration")
             return 1
 
-        # Create clients with retry for Radarr
+        # RadarrClient retries connection errors with backoff internally
         logger.info(f"Initializing Radarr client (URL: {radarr_url})...")
-        max_attempts = 10  # More retries for container startup
-        attempt = 0
-
-        # Calculate exponential backoff times with jitter
-        backoff_times = [min(2 ** i + (i * 0.1), 60)
-                         for i in range(max_attempts)]
-
-        while attempt < max_attempts:
-            attempt += 1
-            backoff = backoff_times[attempt - 1]
-
-            try:
-                radarr_client = RadarrClient(
-                    radarr_url, radarr_api_key, max_retries=3)
-                if radarr_client.test_connection():
-                    logger.info(
-                        f"Successfully connected to Radarr at {radarr_url}")
-                    break
-                else:
-                    logger.warning(
-                        f"Radarr connection test failed "
-                        f"(attempt {attempt}/{max_attempts}), "
-                        f"retrying in {backoff:.2f}s...")
-                    time.sleep(backoff)
-            except Exception as e:
-                if attempt >= max_attempts:
-                    logger.error(
-                        f"Failed to connect to Radarr at {radarr_url} after "
-                        f"{max_attempts} attempts")
-                    logger.error(f"Last error: {str(e)}")
-                    raise
-
-                logger.warning(
-                    f"Error initializing Radarr client (attempt {attempt}/{max_attempts}): "
-                    f"{str(e)}")
-                logger.warning(f"Retrying in {backoff:.2f}s...")
-                time.sleep(backoff)
+        radarr_client = RadarrClient(radarr_url, radarr_api_key, max_retries=10)
+        if not radarr_client.test_connection():
+            logger.error(f"Failed to connect to Radarr at {radarr_url}")
+            return 1
+        logger.info(f"Successfully connected to Radarr at {radarr_url}")
 
         logger.info("Initializing Claude client...")
         # Get optional model override from config
@@ -581,21 +499,6 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
         all_movies = radarr_client.get_movies()
         logger.info(f"Retrieved {len(all_movies)} movies from Radarr")
 
-        # Set up batch size optimization test if requested
-        if args.optimize_batch_size:
-            logger.info(
-                "Starting batch size optimization test")
-            return run_batch_size_optimization(
-                radarr_client=radarr_client,
-                claude_client=claude_client,
-                state_manager=state_manager,
-                collections=collections,
-                all_movies=all_movies,  # Pass the already fetched movies
-                output_file=(
-                    args.profile_output or "batch_size_optimization.json"
-                )
-            )
-
         # Calculate next run time if not in run-now mode
         if not args.run_now:
             next_run_time = calculate_schedule()
@@ -621,7 +524,6 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
             logger.info(
                 f"Starting processing run at {formatted_start}")
 
-            # Process collections with profiling if enabled
             results = process_collections(
                 radarr_client=radarr_client,
                 claude_client=claude_client,
@@ -630,22 +532,9 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
                 all_movies=all_movies,  # Pass the already fetched movies
                 dry_run=args.dry_run,
                 batch_size=args.batch_size,
-                force_refresh=args.force_refresh,
-                enable_profiling=args.profile or args.memory_profile
+                force_refresh=args.force_refresh
             )
 
-            # Save profiling results if enabled
-            if args.profile and "profiling" in results:
-                profile_output = args.profile_output or "profile_results.json"
-                logger.info(f"Saving profiling results to {profile_output}")
-
-                try:
-                    with open(profile_output, 'w') as f:
-                        json.dump(results["profiling"], f, indent=2)
-                    logger.info(f"Profiling results saved to {profile_output}")
-                except Exception as e:
-                    logger.error(f"Error saving profiling results: {e}")
-                    
             # Log the total cost spent on Claude API
             usage_stats = claude_client.get_usage_stats()
             total_cost = usage_stats.get('total_cost', 0.0)
@@ -657,13 +546,7 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
                        f"({total_input_tokens:,} input tokens, {total_output_tokens:,} output tokens)")
 
             # Calculate next run time for notification
-            notification_run_time: Optional[datetime] = None
-            # If it's the first run with run-now and we want to continue, calculate the next scheduled time
-            if args.run_now and first_run:
-                notification_run_time = calculate_schedule()
-            # Otherwise use normal logic
-            elif not args.run_now:
-                notification_run_time = calculate_schedule()
+            notification_run_time = calculate_schedule()
 
             # Send notifications
             send_notifications(
@@ -679,13 +562,7 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
                 
             if args.run_now and first_run:
                 logger.info("Initial run-now execution completed. Switching to scheduled mode.")
-                # Reset first_run flag to continue with scheduled runs
                 first_run = False
-                # Calculate the next scheduled run time immediately
-                next_run_time = calculate_schedule()
-                formatted_next = next_run_time.strftime("%Y-%m-%d %H:%M:%S")
-                logger.info(f"Next scheduled run at {formatted_next}")
-                # No break here, continue to the sleep section
 
             # Sleep until next run
             next_run_time = calculate_schedule()
@@ -724,138 +601,6 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
                 f"Failed to send error notification: {str(notify_error)}")
 
         return 1
-
-
-def run_batch_size_optimization(
-    radarr_client: RadarrClient,
-    claude_client: ClaudeClient,
-    state_manager: StateManager,
-    collections: List[Any],
-    all_movies: Optional[List[Any]] = None,
-    output_file: str = "batch_size_optimization.json"
-) -> int:
-    """Run batch size optimization test.
-
-    This test runs the same collection processing with different batch sizes
-    to determine the optimal size for performance and cost.
-
-    Args:
-        radarr_client: Radarr API client
-        claude_client: Claude API client
-        state_manager: State manager
-        collections: List of collections to test
-        all_movies: Optional list of movies already fetched from Radarr
-        output_file: File to save results
-
-    Returns:
-        Exit code (0 for success, non-zero for error)
-    """
-    logger = logging.getLogger(__name__)
-
-    # Use provided movies or fetch them if not provided
-    if all_movies is None:
-        # Fetch all movies once
-        logger.info("Fetching movies from Radarr for batch size testing")
-        all_movies = radarr_client.get_movies()
-        logger.info(f"Retrieved {len(all_movies)} movies")
-    else:
-        logger.info(f"Using {len(all_movies)} movies already fetched from Radarr for batch size testing")
-
-    # Select a single collection for testing
-    if not collections:
-        logger.error("No collections found for testing")
-        return 1
-
-    test_collection = collections[0]
-    logger.info(
-        f"Using collection '{test_collection.name}' for batch size testing")
-
-    # Define batch sizes to test
-    batch_sizes = [50, 100, 150, 200, 250, 300]
-
-    # Store results
-    results = {
-        "collection": test_collection.name,
-        "movie_count": len(all_movies),
-        "timestamp": datetime.now().isoformat(),
-        "batch_results": {}
-    }
-
-    # Test each batch size
-    for batch_size in batch_sizes:
-        logger.info(f"Testing batch size: {batch_size}")
-
-        # Reset clients to ensure clean testing
-        claude_client.reset_usage_stats()
-        profiler.start()
-
-        start_time = time.time()
-
-        # Process with this batch size
-        processor = MovieProcessor(
-            claude_client=claude_client,
-            state_manager=state_manager,
-            batch_size=batch_size,
-            force_refresh=True
-        )
-
-        included_ids, excluded_ids, stats = processor.process_collection(
-            collection=test_collection,
-            movies=all_movies
-        )
-
-        duration = time.time() - start_time
-        profiling_data = profiler.stop()
-
-        # Store batch results
-        results["batch_results"][str(batch_size)] = {
-            "duration": duration,
-            "included_count": len(included_ids),
-            "excluded_count": len(excluded_ids),
-            "claude_usage": claude_client.get_usage_stats(),
-            "profiling": profiling_data,
-            "cost_per_movie": (
-                stats.get("total_cost", 0) / len(all_movies)
-                if len(all_movies) > 0 else 0
-            )
-        }
-
-        logger.info(
-            f"Batch size {batch_size} completed in {duration:.2f}s - "
-            f"Token usage: {stats.get('total_input_tokens', 0)} input, "
-            f"{stats.get('total_output_tokens', 0)} output")
-
-        # Wait a bit between tests to avoid rate limits
-        time.sleep(2)
-
-    # Calculate optimal batch size based on cost and speed
-    optimal_size = None
-    best_efficiency = 0
-
-    for size, data in results["batch_results"].items():
-        # Calculate efficiency as movies processed per second per dollar
-        if data["duration"] > 0 and data["claude_usage"]["total_cost"] > 0:
-            movies_per_second = len(all_movies) / data["duration"]
-            cost_efficiency = (
-                movies_per_second / data["claude_usage"]["total_cost"])
-            data["efficiency"] = cost_efficiency
-
-            if cost_efficiency > best_efficiency:
-                best_efficiency = cost_efficiency
-                optimal_size = int(size)
-
-    results["optimal_batch_size"] = optimal_size
-
-    # Save results
-    try:
-        with open(output_file, 'w') as f:
-            json.dump(results, f, indent=2)
-        logger.info(f"Batch size optimization results saved to {output_file}")
-    except Exception as e:
-        logger.error(f"Error saving optimization results: {e}")
-
-    logger.info(f"Optimal batch size determined to be {optimal_size}")
-    return 0
 
 
 def send_test_email() -> bool:

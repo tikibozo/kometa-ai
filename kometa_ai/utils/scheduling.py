@@ -139,18 +139,4 @@ def sleep_until(target_time: datetime) -> None:
 
     sleep_seconds = (target_time - now).total_seconds()
     logger.info(f"Sleeping until {target_time} ({sleep_seconds:.1f} seconds)")
-
-    while datetime.now() < target_time:
-        # Sleep in shorter intervals to allow for interruption
-        remaining = (target_time - datetime.now()).total_seconds()
-        if remaining <= 0:
-            break
-
-        # Sleep for at most 60 seconds at a time
-        sleep_time = min(remaining, 60)
-        time.sleep(sleep_time)
-
-        # Periodically log the remaining time (in debug mode)
-        remaining = (target_time - datetime.now()).total_seconds()
-        if remaining > 0:
-            logger.debug(f"Sleeping for {remaining:.1f} more seconds until {target_time}")
+    time.sleep(sleep_seconds)

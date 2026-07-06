@@ -78,48 +78,6 @@ def setup_logging(debug: bool = False) -> None:
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(log_level)
 
-    # Use human-readable formats with timestamp and level for both normal and debug mode
-    if debug:
-        console_format = "%(asctime)s - %(levelname)s - %(message)s"
-        console_handler.setFormatter(logging.Formatter(console_format))
-    else:
-        console_format = "%(asctime)s - %(levelname)s - %(message)s"
-        console_handler.setFormatter(logging.Formatter(console_format))
+    console_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
 
     root_logger.addHandler(console_handler)
-
-
-class LoggerAdapter(logging.LoggerAdapter):
-    """Logger adapter to add extra fields to log records."""
-
-    def __init__(self, logger: logging.Logger, extra: Optional[Dict[str, Any]] = None):
-        """Initialize the logger adapter.
-
-        Args:
-            logger: The logger to adapt
-            extra: Extra fields to add to all log records
-        """
-        if extra is None:
-            extra = {}
-        super().__init__(logger, extra)
-
-    def process(self, msg: str, kwargs: MutableMapping[str, Any]) -> tuple[str, MutableMapping[str, Any]]:
-        """Process the log record to add extra fields.
-
-        Args:
-            msg: The log message
-            kwargs: Keyword arguments for the log record
-
-        Returns:
-            Tuple of (message, kwargs)
-        """
-        # Add extra fields to record
-        if "extra" not in kwargs:
-            kwargs["extra"] = {}
-
-        # Handle case when self.extra might be None
-        if self.extra:
-            for key, value in self.extra.items():
-                kwargs["extra"][key] = value
-
-        return msg, kwargs

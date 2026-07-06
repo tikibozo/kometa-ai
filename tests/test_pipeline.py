@@ -618,13 +618,13 @@ class TestEndToEndPipeline:
         
     def test_tag_mismatch_correction_in_pipeline(self, test_env, monkeypatch):
         """Test that tag mismatches are auto-fixed in the pipeline when enabled."""
-        # Access the parser and files
-        parser = test_env["parser"]
         config_dir = test_env["config_dir"]
-        
-        # Enable auto-fix
+
+        # Enable auto-fix; the parser reads the env var at construction time
         monkeypatch.setenv('KOMETA_FIX_TAGS', 'true')
-        
+        from kometa_ai.kometa.parser import KometaParser
+        parser = KometaParser(str(config_dir))
+
         # Process the yaml files
         files = parser.find_yaml_files()
         blocks = parser.extract_ai_blocks(files[0])

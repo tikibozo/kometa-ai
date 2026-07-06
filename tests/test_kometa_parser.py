@@ -179,6 +179,8 @@ class TestKometaParser:
             
     def test_tag_mismatch_detection(self, test_config_with_tag_mismatch, monkeypatch, caplog):
         """Test detection of mismatched tags."""
+        import logging
+        caplog.set_level(logging.INFO)
         # Ensure auto-fix is disabled
         monkeypatch.setenv('KOMETA_FIX_TAGS', 'false')
         

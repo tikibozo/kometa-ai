@@ -83,48 +83,6 @@ class TestStateManager:
         assert state_manager.get_decision(1, "Test Collection") is None
         assert len(state_manager.state["decisions"]) == 0
     
-    def test_get_decisions_for_movie(self, state_manager):
-        """Test getting all decisions for a movie."""
-        # Add decisions for two collections
-        decision1 = DecisionRecord(
-            movie_id=1,
-            collection_name="Collection1",
-            include=True,
-            confidence=0.9,
-            metadata_hash="abcdef",
-            tag="KAI-collection1",
-            timestamp=datetime.now(UTC).isoformat()
-        )
-        decision2 = DecisionRecord(
-            movie_id=1,
-            collection_name="Collection2",
-            include=False,
-            confidence=0.3,
-            metadata_hash="abcdef",
-            tag="KAI-collection2",
-            timestamp=datetime.now(UTC).isoformat()
-        )
-        state_manager.set_decision(decision1)
-        state_manager.set_decision(decision2)
-        
-        # Get all decisions for the movie
-        decisions = state_manager.get_decisions_for_movie(1)
-        assert len(decisions) == 2
-        
-        # Check collection names
-        collection_names = [d.collection_name for d in decisions]
-        assert "Collection1" in collection_names
-        assert "Collection2" in collection_names
-        
-        # Check decision details
-        for decision in decisions:
-            if decision.collection_name == "Collection1":
-                assert decision.include is True
-                assert decision.confidence == 0.9
-            elif decision.collection_name == "Collection2":
-                assert decision.include is False
-                assert decision.confidence == 0.3
-    
     def test_log_change(self, state_manager):
         """Test logging a tag change."""
         state_manager.log_change(

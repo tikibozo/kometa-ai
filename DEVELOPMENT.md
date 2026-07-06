@@ -31,11 +31,7 @@ This guide provides comprehensive instructions for setting up, developing, and t
 ### Option 2: Using Docker
 
 1. Make sure Docker and Docker Compose are installed and running
-2. Use the provided Docker development script:
-   ```bash
-   ./docker_dev.sh
-   ```
-   Or use Docker Compose directly:
+2. Use Docker Compose:
    ```bash
    docker-compose -f docker-compose.dev.yml up -d
    ```
@@ -75,7 +71,7 @@ The simplest way to run Kometa-AI is using the helper scripts:
 
 2. For Docker development:
    ```bash
-   ./docker_dev.sh
+   docker-compose -f docker-compose.dev.yml up -d
    ```
 
 ### Manual Execution
@@ -204,23 +200,10 @@ For testing with a real Radarr instance:
    ./run_test_env.sh
    ```
 
-2. Run automated Radarr tests:
+2. Run automated Radarr tests (includes an option to add sample movies):
    ```bash
    ./radarr_test.sh
    ```
-
-3. Add test movies to Radarr:
-   ```bash
-   python add_test_movies.py
-   ```
-
-### Docker Test Environment
-
-Run the application with the test Docker configuration:
-
-```bash
-docker-compose -f docker-compose.test.yml up -d
-```
 
 ## Common Commands and Operations
 
@@ -307,9 +290,6 @@ For more detailed performance testing with synthetic data:
    ```bash
    # Test with small dataset
    python test_large_dataset.py -f test_data/small_test.json -b 150
-
-   # Test memory optimization
-   python test_optimization.py test_data/medium_test.json
 
    # Test with batch size optimization
    python test_large_dataset.py -f test_data/medium_test.json --optimize-batch-size

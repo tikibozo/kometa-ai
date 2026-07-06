@@ -229,30 +229,7 @@ class KometaParser:
         in_prompt = False
         prompt_indent = ""  # Track the indentation of the prompt content
 
-        # First pass: Identify all regular keys that come before 'prompt'
-        regular_keys = []
-
-        for i, line in enumerate(lines):
-            stripped = line.strip()
-            if not stripped or not stripped.startswith('#'):
-                continue
-
-            # Remove comment marker but keep indentation
-            if stripped.startswith('# '):
-                cleaned = stripped[2:]
-            else:
-                cleaned = stripped[1:]
-
-            # Identify the prompt start
-            if ':' in cleaned and 'prompt:' in cleaned.lower():
-                # Found the prompt, no need to continue first pass
-                break
-
-            # Track regular keys before the prompt
-            if ':' in cleaned:
-                regular_keys.append((i, cleaned))
-
-        # Now process all lines
+        # Process all lines
         for i, line in enumerate(lines):
             # Skip empty lines
             stripped = line.strip()

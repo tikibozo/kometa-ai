@@ -1,0 +1,64 @@
+[
+  {
+    "id": 1001,
+    "title": "The Adventure Quest",
+    "year": 2020,
+    "overview": "A group of friends embark on an epic adventure to find a hidden treasure.",
+    "genres": [
+      "Adventure",
+      "Action",
+      "Fantasy"
+    ],
+    "tagline": "The greatest adventure awaits",
+    "runtime": 124,
+    "rating": 7.8,
+    "director": "Jane Smith",
+    "actors": [
+      "John Doe",
+      "Sarah Johnson",
+      "Mike Williams"
+    ],
+    "studio": "Adventure Studios"
+  },
+  {
+    "id": 1002,
+    "title": "Mystery in the Dark",
+    "year": 2018,
+    "overview": "A detective investigates a series of mysterious disappearances in a small town.",
+    "genres": [
+      "Mystery",
+      "Thriller",
+      "Crime"
+    ],
+    "tagline": "The truth lies in the shadows",
+    "runtime": 112,
+    "rating": 8.2,
+    "director": "Robert Brown",
+    "actors": [
+      "Emily Clark",
+      "David Wilson",
+      "Linda Martin"
+    ],
+    "studio": "Enigma Pictures"
+  },
+  {
+    "id": 1003,
+    "title": "Laugh Out Loud",
+    "year": 2021,
+    "overview": "A stand-up comedian tries to make it big while dealing with personal challenges.",
+    "genres": [
+      "Comedy",
+      "Drama"
+    ],
+    "tagline": "Sometimes life is the best punchline",
+    "runtime": 98,
+    "rating": 7.5,
+    "director": "Michael Johnson",
+    "actors": [
+      "Lisa Adams",
+      "Tom Clark",
+      "Kevin White"
+    ],
+    "studio": "Funny Films"
+  }
+]

@@ -47,27 +47,12 @@ class TestConfig:
         assert Config.get_list("NONEXISTENT_LIST") == []
         assert Config.get_list("NONEXISTENT_LIST", ["default"]) == ["default"]
     
-    def test_initialization(self, monkeypatch):
-        """Test config initialization."""
-        # Set required env vars
+    def test_env_values(self, monkeypatch):
+        """Test config values read from environment."""
         monkeypatch.setenv("RADARR_URL", "http://radarr:7878")
         monkeypatch.setenv("RADARR_API_KEY", "api_key")
         monkeypatch.setenv("CLAUDE_API_KEY", "claude_key")
-        
-        cfg = Config()
-        assert cfg.config["RADARR_URL"] == "http://radarr:7878"
-        assert cfg.config["RADARR_API_KEY"] == "api_key"
-        assert cfg.config["CLAUDE_API_KEY"] == "claude_key"
-    
-    def test_as_dict(self, monkeypatch):
-        """Test getting config as dict."""
-        monkeypatch.setenv("RADARR_URL", "http://radarr:7878")
-        monkeypatch.setenv("RADARR_API_KEY", "api_key")
-        monkeypatch.setenv("CLAUDE_API_KEY", "claude_key")
-        
-        cfg = Config()
-        config_dict = cfg.as_dict()
-        
-        assert isinstance(config_dict, dict)
-        assert config_dict["RADARR_URL"] == "http://radarr:7878"
-        assert config_dict["RADARR_API_KEY"] == "api_key"
+
+        assert Config.get("RADARR_URL") == "http://radarr:7878"
+        assert Config.get("RADARR_API_KEY") == "api_key"
+        assert Config.get("CLAUDE_API_KEY") == "claude_key"

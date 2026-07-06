@@ -385,26 +385,5 @@ class RadarrClient:
             logger.error(f"Failed to connect to Radarr API: {str(ve)}")
             return False
         except Exception as e:
-            # Log more detailed error information for connection issues
-            import socket
-            from urllib.parse import urlparse
-
-            # Try to provide more diagnostic information
-            url_parts = urlparse(self.base_url)
-            host = url_parts.hostname
-            port = url_parts.port or (443 if url_parts.scheme == 'https' else 80)
-
-            # Test direct connection to host without HTTP
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.settimeout(2)
-                result = s.connect_ex((host, port))
-                if result == 0:
-                    logger.error(f"TCP connection to {host}:{port} succeeded, but HTTP request failed: {str(e)}")
-                else:
-                    logger.error(f"TCP connection to {host}:{port} failed (errno: {result}): {str(e)}")
-                s.close()
-            except Exception as sock_err:
-                logger.error(f"Could not test TCP connection to {host}:{port}: {str(sock_err)}")
-
+            logger.error(f"Failed to connect to Radarr API: {str(e)}")
             return False
