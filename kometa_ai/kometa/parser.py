@@ -85,7 +85,10 @@ class KometaParser:
                         # Extract collection name (assuming format: "Name:")
                         match = re.match(r'([^:]+):', line)
                         if match:
-                            collection_name = match.group(1).strip()
+                            # Strip YAML quoting so quoted keys like
+                            # "Existential Cinema": resolve to the same name
+                            # everywhere (state, tags, taglist checks)
+                            collection_name = match.group(1).strip().strip('"\'')
                         break
 
                 if not collection_name:
