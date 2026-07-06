@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/tikibozo/kometa-ai/compare/v0.2.1...v0.2.2) (2026-07-06)
+
+
+### Bug Fixes
+
+* entrypoint installs the Claude CLI on demand for CLAUDE_BACKEND=cli ([#5](https://github.com/tikibozo/kometa-ai/issues/5)) ([d58ac52](https://github.com/tikibozo/kometa-ai/commit/d58ac523ca1dd0cddcb064695a36337031b2fe34))
+
 ## [0.2.1](https://github.com/tikibozo/kometa-ai/compare/v0.2.0...v0.2.1) (2026-07-06)
 
 
