@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from kometa_ai.radarr.client import RadarrClient
 from kometa_ai.radarr.models import Movie
@@ -25,7 +25,7 @@ class TagManager:
         collection_name: str,
         tag: str,
         included_movie_ids: List[int],
-        all_movies: List[Movie]
+        all_movies: Optional[List[Movie]] = None
     ) -> List[Dict[str, Any]]:
         """Apply tag changes based on which movies should be included in a collection.
 
@@ -33,7 +33,10 @@ class TagManager:
             collection_name: Name of the collection
             tag: Tag string for the collection (e.g., "KAI-action-movies")
             included_movie_ids: List of movie IDs that should be in the collection
-            all_movies: List of all movies from Radarr
+            all_movies: Optional pre-fetched movie list to diff against. When
+                omitted (the default, and what the pipeline now does), current
+                tag membership is refetched from Radarr immediately before the
+                diff.
 
         Returns:
             List of change dictionaries with movie_id, action, etc.
@@ -42,6 +45,16 @@ class TagManager:
 
         tag_obj = self.radarr.get_or_create_tag(tag)
         tag_id = tag_obj.id
+
+        # Refetch current tag membership immediately before diffing. The run's
+        # start-of-run snapshot can be stale by the time we reconcile — a long
+        # classification pass, or a second kometa-ai run mutating tags in
+        # parallel, means diffing against that snapshot re-adds or re-removes
+        # tags to match day-one state (the concurrent-run clobber bug). A fresh
+        # read (paired with the pipeline run-lock) makes the diff reflect
+        # reality at write time. Callers may still pass an explicit snapshot.
+        if all_movies is None:
+            all_movies = self.radarr.get_movies()
 
         current_movie_ids = {movie.id for movie in all_movies if tag_id in movie.tag_ids}
         included_movie_ids_set = set(included_movie_ids)
