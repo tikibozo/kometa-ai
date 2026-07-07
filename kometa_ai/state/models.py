@@ -19,6 +19,10 @@ class DecisionRecord:
     # Once it reaches the processor's max_revisions, only a metadata change
     # or --force-refresh triggers another evaluation.
     revisions: int = 0
+    # Hash of the collection prompt this decision was made against. When the
+    # prompt changes, the decision is stale and the movie is re-evaluated.
+    # None on legacy records (pre-prompt-hash); backfilled without re-eval.
+    prompt_hash: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'DecisionRecord':
@@ -39,7 +43,8 @@ class DecisionRecord:
             tag=data.get('tag', ''),
             timestamp=data.get('timestamp', datetime.now(UTC).isoformat()),
             reasoning=data.get('reasoning'),
-            revisions=data.get('revisions', 0)
+            revisions=data.get('revisions', 0),
+            prompt_hash=data.get('prompt_hash')
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -63,5 +68,8 @@ class DecisionRecord:
 
         if self.revisions:
             result['revisions'] = self.revisions
+
+        if self.prompt_hash:
+            result['prompt_hash'] = self.prompt_hash
 
         return result

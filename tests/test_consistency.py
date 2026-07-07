@@ -335,3 +335,69 @@ class TestUsageLimit:
         # Every movie is still a member (batch 1 fresh, batch 2 from stored).
         assert set(included) == {1, 2, 3}
         assert excluded == []
+
+
+class TestPromptHash:
+    def _coll(self, prompt):
+        return CollectionConfig(
+            name="Test", slug="test", enabled=True,
+            prompt=prompt, confidence_threshold=0.7,
+        )
+
+    def test_prompt_change_reevaluates_collection(self, client, state_manager):
+        movies = [make_movie(1), make_movie(2)]
+        client.script[1] = (True, 0.95)
+        client.script[2] = (False, 0.9)
+
+        run(client, state_manager, self._coll("criteria A"), movies)
+        assert len(client.batches) == 1
+
+        # Same prompt -> nothing reprocessed
+        run(client, state_manager, self._coll("criteria A"), movies)
+        assert len(client.batches) == 1
+
+        # Changed prompt -> the collection is re-evaluated
+        run(client, state_manager, self._coll("criteria B, stricter"), movies)
+        assert len(client.batches) == 2
+
+    def test_new_decisions_record_prompt_hash(self, client, state_manager):
+        from kometa_ai.claude.processor import prompt_hash
+        movies = [make_movie(1)]
+        client.script[1] = (True, 0.95)
+        run(client, state_manager, self._coll("criteria A"), movies)
+        stored = state_manager.get_decision(1, "Test")
+        assert stored.prompt_hash == prompt_hash("criteria A")
+
+    def test_legacy_decision_backfilled_not_reevaluated(self, client, state_manager):
+        from kometa_ai.claude.processor import prompt_hash
+        from kometa_ai.state.models import DecisionRecord
+        movie = make_movie(1)
+        # A pre-prompt-hash record: metadata hash matches so only a prompt
+        # change could reprocess it; prompt_hash is None (legacy).
+        legacy = DecisionRecord(
+            movie_id=1, collection_name="Test", include=True, confidence=0.95,
+            metadata_hash=movie.calculate_metadata_hash(), tag="KAI-test",
+            timestamp="2025-01-01T00:00:00+00:00", prompt_hash=None,
+        )
+        state_manager.set_decision(legacy)
+
+        run(client, state_manager, self._coll("criteria A"), [movie])
+        # Not re-evaluated (no Claude call)...
+        assert client.batches == []
+        # ...but the hash is backfilled so a future change is detectable.
+        assert state_manager.get_decision(1, "Test").prompt_hash == prompt_hash("criteria A")
+
+    def test_prompt_change_bypasses_hysteresis(self, client, state_manager):
+        # A marginal flip that hysteresis would normally block is accepted when
+        # the prompt itself changed (the prior verdict is against old criteria).
+        movie = make_movie(1)
+        client.script[1] = (True, 0.95)
+        run(client, state_manager, self._coll("criteria A"), [movie])
+
+        # New verdict: exclude at 0.35 -> membership score 0.65, inside the
+        # hysteresis margin (would be kept as a member on a near-threshold
+        # re-eval), but a prompt change forces a fresh judgment.
+        client.script[1] = (False, 0.35)
+        included, excluded, _ = run(client, state_manager, self._coll("criteria B"), [movie])
+        assert included == []
+        assert excluded == [1]
