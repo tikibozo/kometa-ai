@@ -12,6 +12,7 @@ from datetime import datetime
 from kometa_ai.__version__ import __version__
 from kometa_ai.config import Config
 from kometa_ai.utils.logging import setup_logging
+from kometa_ai.utils.run_lock import acquire_run_lock
 from kometa_ai.utils.scheduling import calculate_next_run_time, sleep_until
 from kometa_ai.radarr.client import RadarrClient
 from kometa_ai.claude.client import ClaudeBackend, ClaudeClient
@@ -273,11 +274,13 @@ def process_collections(
             if not dry_run:
                 logger.info(
                     f"Applying tag changes for collection '{collection.name}'...")
+                # Pass no snapshot: reconcile refetches current tag state from
+                # Radarr so the diff reflects reality at write time, not the
+                # (possibly stale) start-of-run snapshot.
                 changes = tag_manager.reconcile_collection_membership(
                     collection_name=collection.name,
                     tag=collection.tag,
                     included_movie_ids=included_ids,
-                    all_movies=all_movies
                 )
 
                 for change in changes:
@@ -553,25 +556,48 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
             logger.info(
                 f"Starting processing run at {formatted_start}")
 
-            # Refresh config and library each run — the daemon can run for
-            # weeks, and stale snapshots would miss new movies and re-apply
-            # tags against day-one state
-            collections = load_collections()
-            logger.info(f"Found {len(collections)} collections to process")
-            logger.info("Fetching movies from Radarr")
-            all_movies = radarr_client.get_movies()
-            logger.info(f"Retrieved {len(all_movies)} movies from Radarr")
+            # Serialize the fetch→process→reconcile window across processes so a
+            # scheduled run and a manual --run-now exec can't overlap and clobber
+            # each other's Radarr tags. If another run holds the lock, skip this
+            # cycle and retry on the next schedule.
+            with acquire_run_lock(state_dir) as got_lock:
+                if not got_lock:
+                    results = None
+                else:
+                    # Refresh config and library each run — the daemon can run
+                    # for weeks, and stale snapshots would miss new movies and
+                    # re-apply tags against day-one state
+                    collections = load_collections()
+                    logger.info(f"Found {len(collections)} collections to process")
+                    logger.info("Fetching movies from Radarr")
+                    all_movies = radarr_client.get_movies()
+                    logger.info(f"Retrieved {len(all_movies)} movies from Radarr")
 
-            results = process_collections(
-                radarr_client=radarr_client,
-                claude_client=claude_client,
-                state_manager=state_manager,
-                collections=collections,
-                all_movies=all_movies,  # Pass the already fetched movies
-                dry_run=args.dry_run,
-                batch_size=args.batch_size,
-                force_refresh=args.force_refresh
-            )
+                    results = process_collections(
+                        radarr_client=radarr_client,
+                        claude_client=claude_client,
+                        state_manager=state_manager,
+                        collections=collections,
+                        all_movies=all_movies,  # Pass the already fetched movies
+                        dry_run=args.dry_run,
+                        batch_size=args.batch_size,
+                        force_refresh=args.force_refresh
+                    )
+
+            if results is None:
+                # Another run held the lock; nothing processed this cycle. Wait
+                # for the next scheduled run and try again.
+                next_run_time = calculate_schedule()
+                formatted_next = next_run_time.strftime("%Y-%m-%d %H:%M:%S")
+                logger.info(
+                    f"Run skipped (another run in progress), waiting until "
+                    f"{formatted_next}")
+                sleep_until(next_run_time)
+                if terminate_requested:
+                    logger.info(
+                        "Termination requested during schedule wait, exiting")
+                    break
+                continue
 
             # Log the total cost spent on Claude API
             usage_stats = claude_client.get_usage_stats()
