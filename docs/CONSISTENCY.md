@@ -87,3 +87,28 @@ decisive enough that the stability pass had nothing left in the
 near-threshold band at all.
 
 Target: <2% raw flip rate, zero changes on a normal re-run. Both met.
+
+## Scaling & cost — pacing the backfill
+
+Steady state is cheap: a movie with a confident, stable decision is never
+re-sent. The cost is entirely the *backfill* — a new collection or a changed
+prompt marks the whole library as needing (re)evaluation. Three levers bound
+that spike (see the README for the config surface):
+
+1. **Candidate prefilter** (`candidate_genres` / `candidate_exclude_genres` /
+   `candidate_year_min|max`): a zero-cost metadata gate applied before any
+   Claude call. Fail-open, so it only removes titles it's confident about.
+   Turns a whole-library sweep into a plausible-candidate sweep.
+
+2. **Bounded, prioritized backfill** (`MAX_EVALS_PER_RUN`): a run-level pool,
+   shared across collections. Near-threshold re-evaluations (the
+   anti-oscillation guarantee) always run; the rest is ordered members-first
+   (a prompt edit corrects Plex within one run) and capped to the budget, with
+   the remainder resuming next run. Converts an unbounded spike into a
+   predictable per-run spend that converges over a few runs. `--force-refresh`
+   bypasses the cap.
+
+3. **Prompt caching** (API backend): the system prompt and each collection
+   prompt are cache breakpoints, so batches after the first in a collection
+   reuse the cached prefix. Cost accounting is cache-aware (writes 1.25x,
+   reads 0.1x of base input). Savings scale inversely with batch size.

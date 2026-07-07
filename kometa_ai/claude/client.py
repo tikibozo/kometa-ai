@@ -5,6 +5,7 @@ from datetime import datetime, UTC
 
 import anthropic
 from anthropic import Anthropic
+from anthropic.types import TextBlockParam
 
 logger = logging.getLogger(__name__)
 
@@ -96,10 +97,26 @@ class ClaudeClient:
         self.model = model if model else DEFAULT_MODEL
         logger.info(f"Initialized Claude client with model {self.model}")
 
-    def _calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
-        """Calculate the cost of a Claude API call in USD."""
+    def _calculate_cost(
+        self,
+        input_tokens: int,
+        output_tokens: int,
+        cache_read_tokens: int = 0,
+        cache_write_tokens: int = 0,
+    ) -> float:
+        """Calculate the cost of a Claude API call in USD.
+
+        Prompt-cache tokens (Lever 5) are billed at Anthropic's published
+        multiples of the base input rate: a cache write costs 1.25x and a cache
+        read 0.1x. Fresh (uncached) input is billed at 1x.
+        """
         input_rate, output_rate = MODEL_PRICING.get(self.model, DEFAULT_PRICING)
-        return (input_tokens / 1_000_000) * input_rate + (output_tokens / 1_000_000) * output_rate
+        billable_input = (
+            input_tokens
+            + cache_write_tokens * 1.25
+            + cache_read_tokens * 0.1
+        )
+        return (billable_input / 1_000_000) * input_rate + (output_tokens / 1_000_000) * output_rate
 
     def _track_usage(self, response: anthropic.types.Message) -> Dict[str, Any]:
         """Track API usage for cost monitoring.
@@ -110,23 +127,32 @@ class ClaudeClient:
         Returns:
             Usage stats for this single request
         """
-        input_tokens = response.usage.input_tokens
-        output_tokens = response.usage.output_tokens
-        cost = self._calculate_cost(input_tokens, output_tokens)
+        usage = response.usage
+        input_tokens = usage.input_tokens
+        output_tokens = usage.output_tokens
+        # Present on responses that hit the prompt cache; absent (None) otherwise
+        cache_read = getattr(usage, 'cache_read_input_tokens', 0) or 0
+        cache_write = getattr(usage, 'cache_creation_input_tokens', 0) or 0
+        cost = self._calculate_cost(input_tokens, output_tokens, cache_read, cache_write)
 
-        self._cost_tracking['total_input_tokens'] = cast(int, self._cost_tracking['total_input_tokens']) + input_tokens
+        # Report the full input size (fresh + cached) so the usage summary
+        # reflects everything processed, not just the uncached remainder.
+        total_input = input_tokens + cache_read + cache_write
+
+        self._cost_tracking['total_input_tokens'] = cast(int, self._cost_tracking['total_input_tokens']) + total_input
         self._cost_tracking['total_output_tokens'] = cast(int, self._cost_tracking['total_output_tokens']) + output_tokens
         self._cost_tracking['total_cost'] = cast(float, self._cost_tracking['total_cost']) + cost
         self._cost_tracking['requests'] = cast(int, self._cost_tracking['requests']) + 1
 
+        cache_note = f", {cache_read} cached" if cache_read else ""
         logger.info(
-            f"Claude API usage: {input_tokens} input tokens, "
+            f"Claude API usage: {input_tokens} input tokens{cache_note}, "
             f"{output_tokens} output tokens, "
             f"cost: ${cost:.4f}"
         )
 
         return {
-            'total_input_tokens': input_tokens,
+            'total_input_tokens': total_input,
             'total_output_tokens': output_tokens,
             'total_cost': cost,
             'requests': 1,
@@ -169,15 +195,37 @@ class ClaudeClient:
             logger.debug(f"Collection prompt: {collection_prompt}")
             logger.debug(f"Movies data: {movies_data}")
 
-        user_prompt = f"{collection_prompt}\n\nMOVIES TO EVALUATE:\n{movies_data}"
+        # Lever 5 — prompt caching. The system prompt is identical across every
+        # collection and run; the collection prompt is identical across every
+        # batch of one collection. Mark both as cache breakpoints so batches
+        # after the first reuse the cached prefix and only the per-batch movie
+        # data (and output) are billed at full rate. The ephemeral cache's
+        # ~5-minute TTL is refreshed on each read, so it stays warm as long as
+        # batches run back-to-back.
+        system_blocks: list[TextBlockParam] = [{
+            "type": "text",
+            "text": system_prompt,
+            "cache_control": {"type": "ephemeral"},
+        }]
+        user_content: list[TextBlockParam] = [
+            {
+                "type": "text",
+                "text": collection_prompt,
+                "cache_control": {"type": "ephemeral"},
+            },
+            {
+                "type": "text",
+                "text": f"MOVIES TO EVALUATE:\n{movies_data}",
+            },
+        ]
 
         # Stream so the large max_tokens doesn't hit SDK HTTP timeouts; the
         # cap leaves headroom for per-movie reasoning on a full batch
         try:
             with self.client.messages.stream(
                 model=self.model,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}],
+                system=system_blocks,
+                messages=[{"role": "user", "content": user_content}],
                 max_tokens=32000,
                 output_config={"format": {"type": "json_schema", "schema": DECISIONS_SCHEMA}},
             ) as stream:

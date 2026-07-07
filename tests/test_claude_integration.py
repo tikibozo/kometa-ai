@@ -344,15 +344,19 @@ class TestClaudeClient:
         """Test the cost tracking functionality."""
         client = ClaudeClient(api_key="test_key")
         
-        # Create a mock response with usage data
+        # Create a mock response with usage data. A real Message.usage always
+        # carries the prompt-cache token fields (int or None); mirror that so
+        # the cache-aware cost path sees concrete values, not auto-mocks.
         mock_response = MagicMock()
         mock_response.usage = MagicMock()
         mock_response.usage.input_tokens = 1000
         mock_response.usage.output_tokens = 500
-        
+        mock_response.usage.cache_read_input_tokens = 0
+        mock_response.usage.cache_creation_input_tokens = 0
+
         # Track usage
         client._track_usage(mock_response)
-        
+
         # Check if costs were tracked correctly
         stats = client.get_usage_stats()
         assert stats["total_input_tokens"] == 1000
