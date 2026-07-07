@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.6](https://github.com/tikibozo/kometa-ai/compare/v0.2.5...v0.2.6) (2026-07-07)
+
+
+### Bug Fixes
+
+* stop the run gracefully when Claude hits a usage limit ([#12](https://github.com/tikibozo/kometa-ai/issues/12)) ([2513873](https://github.com/tikibozo/kometa-ai/commit/2513873d2ee1eadb196f4acf280a15234826c63a))
+
 ## [0.2.5](https://github.com/tikibozo/kometa-ai/compare/v0.2.4...v0.2.5) (2026-07-06)
 
 
