@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/tikibozo/kometa-ai/compare/v0.3.0...v0.4.0) (2026-07-07)
+
+
+### Features
+
+* pace backfill with candidate prefilter, per-run budget, prompt caching ([#17](https://github.com/tikibozo/kometa-ai/issues/17)) ([d18f293](https://github.com/tikibozo/kometa-ai/commit/d18f2933e5940b277769b78b6a9d190c3c1f5e8c))
+
 ## [0.3.0](https://github.com/tikibozo/kometa-ai/compare/v0.2.6...v0.3.0) (2026-07-07)
 
 
