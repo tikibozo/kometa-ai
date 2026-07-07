@@ -103,7 +103,8 @@ class MovieProcessor:
         claude_client: ClaudeBackend,
         state_manager: StateManager,
         batch_size: Optional[int] = None,
-        force_refresh: bool = False
+        force_refresh: bool = False,
+        max_evals_per_run: Optional[int] = None
     ):
         """Initialize the movie processor.
 
@@ -112,16 +113,26 @@ class MovieProcessor:
             state_manager: State manager for persisting decisions
             batch_size: Number of movies to process in each batch
             force_refresh: Force reprocessing of all movies, ignoring cached decisions
+            max_evals_per_run: Soft cap on the number of movies sent to Claude
+                across all collections in one run (Lever 2). None/0 means no
+                cap. Near-threshold re-evaluations are never capped (they are
+                the anti-oscillation guarantee); the backfill of new/changed
+                collections is what gets paced. --force-refresh bypasses it.
         """
         self.claude_client = claude_client
         self.state_manager = state_manager
         self.batch_size = batch_size or DEFAULT_BATCH_SIZE
         self.force_refresh = force_refresh
+        self.max_evals_per_run = max_evals_per_run or 0
         self.system_prompt = get_system_prompt()
 
         # Metadata hashes are collection-independent; cache per movie so a
         # multi-collection run hashes each movie once
         self._hash_cache: Dict[int, str] = {}
+
+        # Run-level count of movies sent to Claude, shared across every
+        # collection processed by this processor instance (the budget pool).
+        self.evals_used = 0
 
         # Store usage statistics for each collection
         self.collection_stats: Dict[str, Dict[str, Any]] = {}
@@ -130,6 +141,57 @@ class MovieProcessor:
         # hit. It's a whole-run condition, so the caller should stop after the
         # current collection rather than start the next one.
         self.usage_limited = False
+
+    def _budget_remaining(self) -> Optional[int]:
+        """Movies still allowed to be sent to Claude this run, or None if the
+        run is uncapped (no budget, or a force refresh)."""
+        if self.force_refresh or not self.max_evals_per_run:
+            return None
+        return max(self.max_evals_per_run - self.evals_used, 0)
+
+    def _priority_tier(
+        self,
+        movie: Movie,
+        reason: Optional[str],
+        existing_decisions: Dict[int, DecisionRecord],
+        threshold: float,
+    ) -> int:
+        """Backfill priority (lower = processed first) within the budget-capped
+        pool. Re-checking standing members of a changed collection comes before
+        judging fresh non-members, so a prompt edit corrects Plex within one run
+        even when the long tail is deferred."""
+        decision = existing_decisions.get(movie.id)
+        member = decision is not None and is_member(
+            decision.include, decision.confidence, threshold
+        )
+        if reason == REASON_PROMPT_CHANGED:
+            return 0 if member else 1
+        if reason == REASON_METADATA_CHANGED:
+            return 2
+        if reason == REASON_NO_DECISION:
+            return 4
+        # Force-refresh (no reason recorded): members first so a tightening pass
+        # re-checks standing members before the rest of the library.
+        return 3 if member else 4
+
+    def _record_filter_exclude(self, movie: Movie, collection: CollectionConfig) -> None:
+        """Persist a deterministic exclude for a movie the candidate filter
+        removed, demoting a standing member so reconcile drops its tag. Stores
+        the current metadata hash so a later metadata change (e.g. the movie
+        gains a qualifying genre) re-opens it for evaluation."""
+        decision = DecisionRecord(
+            movie_id=movie.id,
+            collection_name=collection.name,
+            include=False,
+            confidence=1.0,
+            metadata_hash=self._metadata_hash(movie),
+            tag=collection.tag,
+            timestamp=datetime.now(UTC).isoformat(),
+            reasoning="Excluded by candidate filter (no Claude evaluation)",
+            revisions=0,
+            prompt_hash=prompt_hash(collection.prompt),
+        )
+        self.state_manager.set_decision(decision)
 
     def _metadata_hash(self, movie: Movie) -> str:
         h = self._hash_cache.get(movie.id)
@@ -174,8 +236,35 @@ class MovieProcessor:
 
         current_prompt_hash = prompt_hash(collection.prompt)
 
-        existing_decisions: Dict[int, DecisionRecord] = {}
+        included_ids: List[int] = []
+        excluded_ids: List[int] = []
+
+        # Lever 1 — candidate prefilter. Partition the library before any Claude
+        # call: movies that can't plausibly belong are excluded for free. A
+        # standing member that now fails the filter is demoted in state so
+        # reconcile drops its tag.
+        candidates: List[Movie] = []
+        filtered_ids: List[int] = []
+        filtered_demotions = 0
         for movie in movies:
+            if collection.is_candidate(movie):
+                candidates.append(movie)
+                continue
+            filtered_ids.append(movie.id)
+            prior = self.state_manager.get_decision(movie.id, collection.name)
+            if prior is not None and is_member(prior.include, prior.confidence, threshold):
+                self._record_filter_exclude(movie, collection)
+                filtered_demotions += 1
+        excluded_ids.extend(filtered_ids)
+        if filtered_ids:
+            logger.info(
+                f"Candidate filter kept {len(candidates)} of {len(movies)} movies for "
+                f"'{collection.name}'; excluded {len(filtered_ids)} without a Claude call"
+                + (f" ({filtered_demotions} demoted from the collection)" if filtered_demotions else "")
+            )
+
+        existing_decisions: Dict[int, DecisionRecord] = {}
+        for movie in candidates:
             decision = self.state_manager.get_decision(movie.id, collection.name)
             if decision:
                 existing_decisions[movie.id] = decision
@@ -193,19 +282,20 @@ class MovieProcessor:
         if backfilled:
             logger.info(f"Backfilled prompt hash on {backfilled} legacy decisions for '{collection.name}'")
 
-        # Determine which movies need processing
-        movies_to_process = []
+        # Determine which candidate movies need processing
+        pending: List[Movie] = []
         reprocess_reasons: Dict[int, str] = {}
         if self.force_refresh:
-            movies_to_process = list(movies)
-            logger.info(f"Force refresh requested, processing all {len(movies)} movies")
+            pending = list(candidates)
+            logger.info(f"Force refresh requested, processing all {len(candidates)} candidate movies")
         else:
             # Process movies that:
             # 1. Don't have a previous decision
-            # 2. Have metadata changes
-            # 3. Scored near the threshold, and haven't exhausted their
+            # 2. Were judged against a now-changed prompt
+            # 3. Have metadata changes
+            # 4. Scored near the threshold, and haven't exhausted their
             #    re-evaluation budget (MAX_REVISIONS)
-            for movie in movies:
+            for movie in candidates:
                 current_hash = self._metadata_hash(movie)
                 stored_hash = self.state_manager.get_metadata_hash(movie.id)
                 decision = existing_decisions.get(movie.id)
@@ -224,46 +314,81 @@ class MovieProcessor:
                     reason = REASON_NEAR_THRESHOLD
 
                 if reason:
-                    movies_to_process.append(movie)
+                    pending.append(movie)
                     reprocess_reasons[movie.id] = reason
                     logger.debug(f"Processing movie {movie.id} ({movie.title}): {reason}")
 
-            logger.info(f"Processing {len(movies_to_process)} of {len(movies)} movies for collection '{collection.name}'")
+            logger.info(f"{len(pending)} of {len(candidates)} candidate movies need evaluation for collection '{collection.name}'")
 
-        # Sort so identical inputs always produce identical batches; batch
-        # composition affects Claude's judgments, so keep it deterministic.
-        movies_to_process.sort(key=lambda m: m.id)
+        # Lever 2 — prioritized, budget-capped backfill. Near-threshold
+        # re-evaluations always run (the bounded anti-oscillation pass); the
+        # rest are ordered members-first and drawn against the shared run
+        # budget. Deterministic sort keys keep batch composition stable.
+        always = sorted(
+            (m for m in pending if reprocess_reasons.get(m.id) == REASON_NEAR_THRESHOLD),
+            key=lambda m: m.id,
+        )
+        capped = sorted(
+            (m for m in pending if reprocess_reasons.get(m.id) != REASON_NEAR_THRESHOLD),
+            key=lambda m: (
+                self._priority_tier(m, reprocess_reasons.get(m.id), existing_decisions, threshold),
+                m.id,
+            ),
+        )
+        budget = self._budget_remaining()
+        if budget is None:
+            selected = always + capped
+            deferred: List[Movie] = []
+        else:
+            take = max(budget - len(always), 0)
+            selected = always + capped[:take]
+            deferred = capped[take:]
+        self.evals_used += len(selected)
+
+        movies_to_process = selected
         to_process_ids = {movie.id for movie in movies_to_process}
+
+        if deferred:
+            logger.info(
+                f"Budget cap: deferring {len(deferred)} of {len(pending)} pending movies for "
+                f"'{collection.name}' to a future run "
+                f"(MAX_EVALS_PER_RUN={self.max_evals_per_run}, {self._budget_remaining()} left this run)"
+            )
+
         cached_count = sum(1 for movie_id in existing_decisions if movie_id not in to_process_ids)
 
-        # If no movies need processing, use existing decisions
-        if not movies_to_process:
-            logger.info(f"No movies need processing for collection '{collection.name}'")
-            included_ids: List[int] = []
-            excluded_ids: List[int] = []
-
-            for decision in existing_decisions.values():
-                self._apply_cached(decision, threshold, included_ids, excluded_ids)
-
-            return included_ids, excluded_ids, {"movie_count": len(movies), "processed_movies": 0, "from_cache": cached_count}
-
-        # Process in batches
-        included_ids = []
-        excluded_ids = []
-        all_usage_stats = {
+        all_usage_stats: Dict[str, Any] = {
             'total_input_tokens': 0,
             'total_output_tokens': 0,
             'total_cost': 0.0,
             'requests': 0,
             'batches': 0,
             'processed_movies': 0,
-            'from_cache': cached_count
+            'from_cache': cached_count,
+            'filtered': len(filtered_ids),
+            'deferred': len(deferred),
         }
 
-        # Reserve existing decisions for movies not being reprocessed
+        # Movies with a stored decision that aren't being reprocessed this run
+        # (stable, or deferred by the budget) keep their cached membership.
         for movie_id, decision in existing_decisions.items():
             if movie_id not in to_process_ids:
                 self._apply_cached(decision, threshold, included_ids, excluded_ids)
+
+        # Deferred movies with no prior decision stay untagged this run and are
+        # retried next run (they remain REASON_NO_DECISION).
+        for movie in deferred:
+            if movie.id not in existing_decisions:
+                excluded_ids.append(movie.id)
+
+        # Nothing to send to Claude — everything was filtered, cached, or
+        # deferred. Return the current membership.
+        if not movies_to_process:
+            logger.info(f"No movies need processing for collection '{collection.name}'")
+            self.collection_stats[collection.name] = all_usage_stats
+            included_ids = list(set(included_ids))
+            excluded_ids = list(set(excluded_ids) - set(included_ids))
+            return included_ids, excluded_ids, all_usage_stats
 
         # Process movies in batches
         collection_prompt = format_collection_prompt(collection)

@@ -21,6 +21,10 @@ class Config:
         "CLAUDE_API_KEY": None,  # Required for the api backend
         "CLAUDE_BACKEND": "api",  # "api" (Anthropic API key) or "cli" (claude CLI / subscription)
         "CLAUDE_MODEL": DEFAULT_MODEL,  # Optional: override default Claude model
+        # Soft per-run cap on movies sent to Claude across all collections
+        # (Lever 2). 0 = no cap. Paces the backfill of new/changed collections
+        # on a large library into a predictable, bounded spend per run.
+        "MAX_EVALS_PER_RUN": "0",
         "DEBUG_LOGGING": "false",
         "SMTP_SERVER": None,
         "SMTP_PORT": "25",

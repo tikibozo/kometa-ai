@@ -22,6 +22,10 @@ collections:
   # === KOMETA-AI ===
   # enabled: true
   # confidence_threshold: 0.7
+  # candidate_genres: Crime, Thriller, Film-Noir
+  # candidate_exclude_genres: Documentary
+  # candidate_year_min: 1940
+  # candidate_year_max: 1959
   # prompt: |
   #   Identify film noir movies based on these criteria:
   #   - Made primarily between 1940-1959
@@ -35,6 +39,21 @@ collections:
 
     # ... existing Kometa config ...
 ```
+
+### Candidate prefilter (optional)
+
+For a large library, evaluating every movie against every collection is the
+main cost driver. These optional gates cheaply narrow the pool *before* any
+Claude call — a movie that fails a gate is excluded with no token cost:
+
+- `candidate_genres`: comma-separated; a movie must share at least one genre.
+- `candidate_exclude_genres`: comma-separated; a movie with any of these is excluded.
+- `candidate_year_min` / `candidate_year_max`: inclusive release-year bounds.
+
+All gates are opt-in and **fail open** — a movie missing the data a gate needs
+(no genres, no year) is kept as a candidate — so the filter only ever removes
+titles it is confident about. Draw the net conservatively (broad genres); the
+prompt still does the precise judgment on whatever passes.
 
 There are more example collections in the `config-examples` directory.
 
@@ -115,6 +134,7 @@ services:
 - `CLAUDE_BACKEND`: `api` (Anthropic API key, default) or `cli` (Claude Code CLI / subscription)
 - `CLAUDE_API_KEY`: API key for Claude AI (required for the `api` backend)
 - `CLAUDE_MODEL`: Optional override for Claude model (default: claude-sonnet-5)
+- `MAX_EVALS_PER_RUN`: Soft cap on movies sent to Claude per run across all collections (default: `0` = no cap). Paces the backfill of new or prompt-changed collections into a predictable, bounded spend per run — the remainder resumes on the next run. Near-threshold re-evaluations are never capped, and `--force-refresh` bypasses it. Also settable per-invocation with `--max-evals`.
 - `DEBUG_LOGGING`: Boolean flag to enable detailed logging (default: false)
 - `SMTP_SERVER`: SMTP server address
 - `SMTP_PORT`: SMTP port (default: 25)

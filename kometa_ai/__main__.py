@@ -58,6 +58,9 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
                         help="Override default batch size")
     parser.add_argument("--force-refresh", action="store_true",
                         help="Reprocess all movies, ignoring cached decisions")
+    parser.add_argument("--max-evals", type=int, default=None,
+                        help=("Cap movies sent to Claude per run across all "
+                              "collections (overrides MAX_EVALS_PER_RUN; 0 = no cap)"))
     parser.add_argument("--health-check", action="store_true",
                         help="Run internal health check and exit")
     parser.add_argument("--dump-config", action="store_true",
@@ -193,7 +196,8 @@ def process_collections(
     all_movies: Optional[List[Any]] = None,
     dry_run: bool = False,
     batch_size: Optional[int] = None,
-    force_refresh: bool = False
+    force_refresh: bool = False,
+    max_evals_per_run: Optional[int] = None
 ) -> Dict[str, Any]:
     """Process all collections and apply tag changes.
 
@@ -206,6 +210,8 @@ def process_collections(
         dry_run: If True, don't apply changes
         batch_size: Override default batch size
         force_refresh: Force reprocessing of all movies
+        max_evals_per_run: Soft cap on movies sent to Claude across all
+            collections this run (Lever 2); None/0 = no cap
 
     Returns:
         Dictionary with processing results and statistics
@@ -229,7 +235,8 @@ def process_collections(
         claude_client=claude_client,
         state_manager=state_manager,
         batch_size=batch_size,
-        force_refresh=force_refresh
+        force_refresh=force_refresh,
+        max_evals_per_run=max_evals_per_run
     )
 
     # Track overall statistics
@@ -351,6 +358,17 @@ def process_collections(
 
     # Save state with all changes and errors
     state_manager.save()
+
+    # Surface any budget deferrals so a paced backfill isn't mistaken for a
+    # silent cap — the deferred movies resume on the next run.
+    total_deferred = sum(
+        s.get('deferred', 0) for s in cast(Dict[str, Any], results['collection_stats']).values()
+    )
+    if total_deferred:
+        logger.info(
+            f"{total_deferred} movies deferred by the per-run evaluation budget; "
+            f"they will be processed on subsequent runs"
+        )
 
     # Generate summary with more details
     error_count = len(results['errors'])
@@ -573,6 +591,12 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
                     all_movies = radarr_client.get_movies()
                     logger.info(f"Retrieved {len(all_movies)} movies from Radarr")
 
+                    # CLI --max-evals overrides the MAX_EVALS_PER_RUN env knob
+                    max_evals = (
+                        args.max_evals
+                        if args.max_evals is not None
+                        else Config.get_int("MAX_EVALS_PER_RUN", 0)
+                    )
                     results = process_collections(
                         radarr_client=radarr_client,
                         claude_client=claude_client,
@@ -581,7 +605,8 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
                         all_movies=all_movies,  # Pass the already fetched movies
                         dry_run=args.dry_run,
                         batch_size=args.batch_size,
-                        force_refresh=args.force_refresh
+                        force_refresh=args.force_refresh,
+                        max_evals_per_run=max_evals
                     )
 
             if results is None:
