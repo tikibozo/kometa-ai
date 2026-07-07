@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/tikibozo/kometa-ai/compare/v0.2.6...v0.3.0) (2026-07-07)
+
+
+### Features
+
+* re-evaluate a collection when its prompt changes ([#14](https://github.com/tikibozo/kometa-ai/issues/14)) ([1d4bbf9](https://github.com/tikibozo/kometa-ai/commit/1d4bbf94f6912a3e0fea25e57a3c41a90fc8b314))
+
+
+### Bug Fixes
+
+* prevent concurrent runs from clobbering Radarr tags ([#15](https://github.com/tikibozo/kometa-ai/issues/15)) ([4aa27c7](https://github.com/tikibozo/kometa-ai/commit/4aa27c73cb7ce617e11d4e5a025fd4fa3b6d64d9))
+
 ## [0.2.6](https://github.com/tikibozo/kometa-ai/compare/v0.2.5...v0.2.6) (2026-07-07)
 
 
