@@ -9,6 +9,13 @@ from anthropic import Anthropic
 logger = logging.getLogger(__name__)
 
 
+class ClaudeUsageLimitError(RuntimeError):
+    """Raised when Claude declines further work because a usage/rate limit is
+    hit. This is a whole-run condition, not a per-batch one: every subsequent
+    request will fail the same way until the window resets, so the caller
+    should stop processing rather than hammer the remaining batches."""
+
+
 class ClaudeBackend(Protocol):
     """The contract both Claude backends (API and CLI) must satisfy."""
 
@@ -166,14 +173,19 @@ class ClaudeClient:
 
         # Stream so the large max_tokens doesn't hit SDK HTTP timeouts; the
         # cap leaves headroom for per-movie reasoning on a full batch
-        with self.client.messages.stream(
-            model=self.model,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
-            max_tokens=32000,
-            output_config={"format": {"type": "json_schema", "schema": DECISIONS_SCHEMA}},
-        ) as stream:
-            response = stream.get_final_message()
+        try:
+            with self.client.messages.stream(
+                model=self.model,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+                max_tokens=32000,
+                output_config={"format": {"type": "json_schema", "schema": DECISIONS_SCHEMA}},
+            ) as stream:
+                response = stream.get_final_message()
+        except anthropic.RateLimitError as e:
+            # A 429 is a whole-run condition, same as the CLI backend's usage
+            # limit: let the processor stop rather than hammer every batch.
+            raise ClaudeUsageLimitError(f"Claude API rate limit reached: {e}") from e
 
         usage_stats = self._track_usage(response)
 

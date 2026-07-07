@@ -5,12 +5,32 @@ import subprocess
 from typing import Dict, Any, Optional, Tuple, List
 from datetime import datetime, UTC
 
-from kometa_ai.claude.client import DEFAULT_MODEL
+from kometa_ai.claude.client import DEFAULT_MODEL, ClaudeUsageLimitError
 
 logger = logging.getLogger(__name__)
 
 # A full batch (150 movies) can take several minutes to evaluate
 CLI_TIMEOUT_SECONDS = 900
+
+# Substrings (matched case-insensitively against the CLI's combined output)
+# that mean "the subscription window is exhausted", not "this batch is bad".
+# Seen when the Max plan's rolling limit trips mid-run: the CLI exits non-zero
+# almost instantly, so every remaining batch would fail identically.
+_USAGE_LIMIT_MARKERS = (
+    "usage limit",
+    "rate limit",
+    "rate_limit",
+    "too many requests",
+    "quota",
+    "limit reached",
+    "limit will reset",
+    "resets at",
+)
+
+
+def _is_usage_limit(*texts: str) -> bool:
+    blob = " ".join(t for t in texts if t).lower()
+    return any(marker in blob for marker in _USAGE_LIMIT_MARKERS)
 
 
 class ClaudeCliClient:
@@ -84,13 +104,25 @@ class ClaudeCliClient:
         )
 
         if result.returncode != 0:
+            stderr = result.stderr.strip()
+            stdout = result.stdout.strip()
+            # On a non-zero exit the usage-limit message lands on stdout (stderr
+            # is typically empty), so include both when deciding and reporting.
+            if _is_usage_limit(stderr, stdout):
+                raise ClaudeUsageLimitError(
+                    f"claude CLI hit a usage limit: {(stderr or stdout)[:500]}"
+                )
             raise RuntimeError(
-                f"claude CLI exited {result.returncode}: {result.stderr.strip()[:500]}"
+                f"claude CLI exited {result.returncode}: "
+                f"{(stderr or stdout or '(no output)')[:500]}"
             )
 
         envelope = json.loads(result.stdout)
         if envelope.get("is_error"):
-            raise RuntimeError(f"claude CLI returned error: {envelope.get('result', '')[:500]}")
+            message = str(envelope.get("result", ""))
+            if _is_usage_limit(message):
+                raise ClaudeUsageLimitError(f"claude CLI hit a usage limit: {message[:500]}")
+            raise RuntimeError(f"claude CLI returned error: {message[:500]}")
         return envelope
 
     def _track_usage(self, envelope: Dict[str, Any]) -> Dict[str, Any]:

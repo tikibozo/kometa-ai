@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from kometa_ai.claude.cli_client import ClaudeCliClient
-from kometa_ai.claude.client import ClaudeClient
+from kometa_ai.claude.client import ClaudeClient, ClaudeUsageLimitError
 from kometa_ai.__main__ import make_claude_client
 
 
@@ -72,6 +72,38 @@ class TestClaudeCliClient:
         with patch("subprocess.run", return_value=run_result("", returncode=1, stderr="not logged in")):
             with pytest.raises(RuntimeError, match="not logged in"):
                 client.classify_movies("system", "collection", "[]")
+
+    def test_usage_limit_on_stdout_raises_usage_limit_error(self):
+        # The limit message lands on stdout with an empty stderr (the shape seen
+        # when the Max plan's rolling window trips mid-run).
+        client = ClaudeCliClient()
+        limit = run_result(
+            "Claude AI usage limit reached. Your limit will reset at 3pm.",
+            returncode=1,
+            stderr="",
+        )
+        with patch("subprocess.run", return_value=limit):
+            with pytest.raises(ClaudeUsageLimitError):
+                client.classify_movies("system", "collection", "[]")
+
+    def test_usage_limit_via_error_envelope(self):
+        # returncode 0 but the envelope reports the limit in `result`.
+        envelope = json.dumps({
+            "is_error": True,
+            "result": "You have exceeded your rate limit; too many requests.",
+            "usage": {"input_tokens": 0, "output_tokens": 0},
+        })
+        client = ClaudeCliClient()
+        with patch("subprocess.run", return_value=run_result(envelope)):
+            with pytest.raises(ClaudeUsageLimitError):
+                client.classify_movies("system", "collection", "[]")
+
+    def test_generic_failure_reports_stdout_when_stderr_empty(self):
+        client = ClaudeCliClient()
+        with patch("subprocess.run", return_value=run_result("boom on stdout", returncode=1, stderr="")):
+            with pytest.raises(RuntimeError, match="boom on stdout") as exc:
+                client.classify_movies("system", "collection", "[]")
+        assert not isinstance(exc.value, ClaudeUsageLimitError)
 
     def test_usage_accumulates(self):
         client = ClaudeCliClient()

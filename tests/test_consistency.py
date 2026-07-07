@@ -296,3 +296,42 @@ class TestIncompleteResponses:
         included, excluded, _ = run(client, state_manager, collection, movies)
 
         assert 2 in included  # stored membership preserved
+
+
+class TestUsageLimit:
+    def test_usage_limit_stops_batching_and_preserves_membership(
+        self, client, state_manager, collection
+    ):
+        """A usage limit mid-run stops further batches, flags the processor,
+        and keeps already-decided movies tagged (no spurious removals)."""
+        from kometa_ai.claude.client import ClaudeUsageLimitError
+
+        # Two batches worth; batch 2 hits the limit.
+        movies = [make_movie(i) for i in range(1, 4)]
+        for m in movies:
+            client.script[m.id] = (True, 0.95)
+        # First run decides everyone so we have stored membership.
+        run(client, state_manager, collection, movies)
+
+        # Force everyone back into processing, then fail on the second batch.
+        processor = MovieProcessor(
+            claude_client=client, state_manager=state_manager, batch_size=2,
+            force_refresh=True,
+        )
+        original = client.classify_movies
+        calls = {"n": 0}
+
+        def limit_on_second(system_prompt, collection_prompt, movies_data):
+            calls["n"] += 1
+            if calls["n"] >= 2:
+                raise ClaudeUsageLimitError("usage limit reached")
+            return original(system_prompt, collection_prompt, movies_data)
+
+        client.classify_movies = limit_on_second
+        included, excluded, _ = processor.process_collection(collection, movies)
+
+        assert processor.usage_limited is True
+        assert calls["n"] == 2  # stopped after the limit, did not try batch 3+
+        # Every movie is still a member (batch 1 fresh, batch 2 from stored).
+        assert set(included) == {1, 2, 3}
+        assert excluded == []
