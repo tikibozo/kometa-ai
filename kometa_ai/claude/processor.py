@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import math
 from typing import Dict, List, Any, Optional, Tuple
@@ -29,6 +30,14 @@ THRESHOLD_BUFFER = 0.15
 REASON_NO_DECISION = "no previous decision"
 REASON_METADATA_CHANGED = "metadata changed"
 REASON_NEAR_THRESHOLD = "near threshold confidence"
+REASON_PROMPT_CHANGED = "collection prompt changed"
+
+
+def prompt_hash(prompt: str) -> str:
+    """Stable short hash of a collection prompt. A change means every stored
+    decision for that collection was judged against different criteria and
+    must be re-evaluated."""
+    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
 
 
 def membership_score(include: bool, confidence: float) -> float:
@@ -61,7 +70,9 @@ def apply_status_quo(
     Returns:
         (include, confidence, reasoning, revisions) to record
     """
-    if prior is not None and not force_refresh:
+    # A prompt change invalidates the prior verdict (it was judged against
+    # different criteria), so re-evaluate freshly — no status-quo anchoring.
+    if prior is not None and not force_refresh and reason != REASON_PROMPT_CHANGED:
         new_score = membership_score(include, confidence)
         prior_member = is_member(prior.include, prior.confidence, threshold)
         new_member = is_member(include, confidence, threshold)
@@ -161,11 +172,26 @@ class MovieProcessor:
         threshold = collection.confidence_threshold
         logger.info(f"Processing collection '{collection.name}' with {len(movies)} movies")
 
+        current_prompt_hash = prompt_hash(collection.prompt)
+
         existing_decisions: Dict[int, DecisionRecord] = {}
         for movie in movies:
             decision = self.state_manager.get_decision(movie.id, collection.name)
             if decision:
                 existing_decisions[movie.id] = decision
+
+        # Backfill prompt_hash on legacy records (pre-prompt-hash) without
+        # re-evaluating — assume they're valid for the current prompt. This
+        # anchors them so a LATER prompt change is detectable instead of being
+        # permanently invisible. (Persisted by the caller's state save.)
+        backfilled = 0
+        for decision in existing_decisions.values():
+            if decision.prompt_hash is None:
+                decision.prompt_hash = current_prompt_hash
+                self.state_manager.set_decision(decision)
+                backfilled += 1
+        if backfilled:
+            logger.info(f"Backfilled prompt hash on {backfilled} legacy decisions for '{collection.name}'")
 
         # Determine which movies need processing
         movies_to_process = []
@@ -188,6 +214,8 @@ class MovieProcessor:
 
                 if not decision:
                     reason = REASON_NO_DECISION
+                elif decision.prompt_hash is not None and decision.prompt_hash != current_prompt_hash:
+                    reason = REASON_PROMPT_CHANGED
                 elif stored_hash != current_hash:
                     reason = REASON_METADATA_CHANGED
                 elif (decision.revisions < MAX_REVISIONS
@@ -252,13 +280,16 @@ class MovieProcessor:
             logger.info(f"Processing batch {batch_index + 1}/{num_batches} with {len(batch_movies)} movies")
 
             # Format movie data for this batch, anchoring re-evaluations to
-            # their previous decision (ignored on force refresh)
+            # their previous decision (ignored on force refresh, and on a
+            # prompt change — that prior verdict was made against different
+            # criteria, so anchoring to it would bias toward the stale answer)
             batch_priors = None
             if not self.force_refresh:
                 batch_priors = {
                     movie.id: existing_decisions[movie.id]
                     for movie in batch_movies
                     if movie.id in existing_decisions
+                    and reprocess_reasons.get(movie.id) != REASON_PROMPT_CHANGED
                 }
             movies_data = format_movies_data(batch_movies, batch_priors)
 
@@ -408,7 +439,8 @@ class MovieProcessor:
                 tag=collection.tag,
                 timestamp=datetime.now(UTC).isoformat(),
                 reasoning=reasoning,
-                revisions=revisions
+                revisions=revisions,
+                prompt_hash=prompt_hash(collection.prompt)
             )
 
             # Store decision
