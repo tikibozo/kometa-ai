@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/tikibozo/kometa-ai/compare/v0.4.0...v0.4.1) (2026-07-14)
+
+
+### Bug Fixes
+
+* **deps:** update python docker tag to v3.14 ([#20](https://github.com/tikibozo/kometa-ai/issues/20)) ([21464f2](https://github.com/tikibozo/kometa-ai/commit/21464f27ad72c141bf9f5ef79ec2203dda239a4f))
+
 ## [0.4.0](https://github.com/tikibozo/kometa-ai/compare/v0.3.0...v0.4.0) (2026-07-07)
 
 
