@@ -433,10 +433,19 @@ def send_notifications(
     # Get changes metadata
     changes_metadata = state_manager.get_changes_metadata()
     total_changes = changes_metadata.get('total_count', len(recent_changes))
-    
+
+    # Summarize the direction of the changes in the subject. On a truncated
+    # run (>500 changes) the +/- is only of the retained subset, so omit it.
+    added = sum(1 for c in recent_changes if c.get('action') == 'added')
+    removed = sum(1 for c in recent_changes if c.get('action') == 'removed')
+    if changes_metadata.get('truncated'):
+        change_desc = f"{total_changes} changes"
+    else:
+        change_desc = f"{total_changes} changes (+{added}/-{removed})"
+
     # Format email content
     subject = (
-        f"Kometa-AI Processing Report: {total_changes} changes, "
+        f"Kometa-AI Processing Report: {change_desc}, "
         f"{len(recent_errors)} errors"
     )
 

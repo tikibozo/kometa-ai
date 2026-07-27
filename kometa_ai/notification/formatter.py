@@ -182,14 +182,20 @@ class NotificationFormatter:
         changes_truncated = changes_metadata and changes_metadata.get('truncated', False)
         total_changes = changes_metadata.get('total_count', len(changes)) if changes_metadata else len(changes)
 
+        added = sum(1 for c in changes if c.get("action") == "added")
+        removed = sum(1 for c in changes if c.get("action") == "removed")
+
         lines.append("## Overview")
         lines.append("")
-        
+
         if changes_truncated:
-            lines.append(f"- Total changes: {total_changes} (showing the most recent {len(changes)})")
+            lines.append(
+                f"- Total changes: {total_changes} "
+                f"(showing the most recent {len(changes)}: +{added}/-{removed})"
+            )
         else:
-            lines.append(f"- Total changes: {total_changes}")
-            
+            lines.append(f"- Total changes: {total_changes} (+{added}/-{removed})")
+
         lines.append(f"- Errors: {len(errors)}")
 
         if next_run_time:

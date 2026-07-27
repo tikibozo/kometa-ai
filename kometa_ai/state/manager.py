@@ -252,12 +252,19 @@ class StateManager:
 
         changes.append(change)
 
-        # Keep only the last 500 changes
+        # Keep only the 500 most recent change records. Once past that cap,
+        # track the true cumulative total in metadata so the summary can report
+        # "N changes (showing the most recent 500)". Accumulate on each overflow
+        # append — after the first truncation len(changes) is pinned at 501, so
+        # reading it directly would freeze the reported total at 501.
         if len(changes) > 500:
-            # Store the total count before truncating
-            self.state.setdefault('changes_metadata', {})
-            self.state['changes_metadata']['total_count'] = len(changes)
-            self.state['changes_metadata']['truncated'] = True
+            meta = self.state.setdefault(
+                'changes_metadata', {'truncated': False, 'total_count': 0})
+            if meta.get('truncated'):
+                meta['total_count'] = meta.get('total_count', 500) + 1
+            else:
+                meta['total_count'] = len(changes)
+                meta['truncated'] = True
             # Keep the 500 most recent changes
             self.state['changes'] = changes[-500:]
 
@@ -292,11 +299,22 @@ class StateManager:
         
     def get_changes_metadata(self) -> Dict[str, Any]:
         """Get metadata about changes, including total count if truncated.
-        
+
+        total_count always reflects the actual change records. A stored
+        metadata block is trusted only when it marks a genuine truncation
+        (>500 changes in one run, where the real count exceeds the retained
+        list); otherwise the count is recomputed from the current changes.
+        Without this, a stale block — e.g. the zeroed one clear_changes writes
+        after a prior notification — would make every later summary report
+        0 changes even when changes exist.
+
         Returns:
             Dictionary with metadata about changes
         """
-        return self.state.get('changes_metadata', {'truncated': False, 'total_count': len(self.get_changes())})
+        meta = self.state.get('changes_metadata')
+        if meta and meta.get('truncated'):
+            return meta
+        return {'truncated': False, 'total_count': len(self.get_changes())}
 
     def get_errors(self) -> List[Dict[str, Any]]:
         """Get recent errors.
@@ -313,7 +331,10 @@ class StateManager:
     def clear_changes(self) -> None:
         """Clear all change records and their metadata from the state."""
         self.state['changes'] = []
-        self.state['changes_metadata'] = {'truncated': False, 'total_count': 0}
+        # Drop the metadata rather than persist a zeroed block — a stored
+        # {total_count: 0} would otherwise be reported as the total on the
+        # next run's summary even after new changes are logged.
+        self.state.pop('changes_metadata', None)
 
     def dump(self) -> str:
         """Dump state as formatted JSON string.

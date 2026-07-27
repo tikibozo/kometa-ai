@@ -422,7 +422,7 @@ class TestNotificationFormatter:
         # Verify format
         assert "# Kometa-AI Summary (v1.0.0)" in result
         assert "## Overview" in result
-        assert "- Total changes: 2" in result
+        assert "- Total changes: 2 (+2/-0)" in result
         assert "- Errors: 1" in result
         assert "- Next scheduled run: 2023-01-02 03:00:00" in result
         assert "## Changes by Collection" in result

@@ -172,3 +172,36 @@ class TestStateManager:
         # Verify changes were cleared
         changes = state_manager.get_changes()
         assert len(changes) == 0
+
+    def test_changes_metadata_reflects_new_changes_after_clear(self, state_manager):
+        """Regression: after a notification clears changes, the next run's
+        change metadata must report the NEW changes, not a stale zero.
+
+        (clear_changes used to persist {total_count: 0}, which
+        get_changes_metadata then returned on every subsequent run — so the
+        summary email always read "0 changes" even with changes present.)
+        """
+        # Run 1: two changes, then cleared (as send_notifications does).
+        state_manager.log_change(1, "A", "C", "added", "KAI-c")
+        state_manager.log_change(2, "B", "C", "removed", "KAI-c")
+        assert state_manager.get_changes_metadata()["total_count"] == 2
+        state_manager.clear_changes()
+        assert state_manager.get_changes_metadata()["total_count"] == 0
+
+        # Run 2: three new changes — metadata must report 3, not 0.
+        state_manager.log_change(3, "D", "C", "added", "KAI-c")
+        state_manager.log_change(4, "E", "C", "added", "KAI-c")
+        state_manager.log_change(5, "F", "C", "removed", "KAI-c")
+        meta = state_manager.get_changes_metadata()
+        assert meta["total_count"] == 3
+        assert meta["truncated"] is False
+
+    def test_changes_metadata_truncation_preserves_real_total(self, state_manager):
+        """When >500 changes occur in one run, total_count keeps the real
+        pre-truncation count while the list retains only the most recent 500."""
+        for i in range(600):
+            state_manager.log_change(i, f"M{i}", "C", "added", "KAI-c")
+        meta = state_manager.get_changes_metadata()
+        assert meta["truncated"] is True
+        assert meta["total_count"] == 600
+        assert len(state_manager.get_changes()) == 500
