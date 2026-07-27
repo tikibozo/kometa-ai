@@ -1,31 +1,37 @@
+import html as html_lib
 import logging
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 from collections import defaultdict
-import json
 
 logger = logging.getLogger(__name__)
 
+# Palette for the HTML email (inline styles only — Outlook's Word-based
+# renderer ignores <style> blocks and most modern CSS, but honors inline
+# colors and table borders).
+_GREEN = "#1a7f37"
+_RED = "#c9252d"
+_MUTE = "#6b7280"
+_ZERO = "#9ca3af"
+_BORDER = "#e5e7eb"
+
 
 class NotificationFormatter:
-    """Formatter for email notifications with detailed information about changes and errors."""
+    """Formats status emails as clean plain text plus an Outlook-safe HTML
+    alternative (multipart/alternative — HTML renders in Outlook, plain text
+    is the fallback for text-only clients)."""
 
     @staticmethod
-    def _format_changes_by_collection(changes: List[Dict[str, Any]]) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
-        """Group changes by collection and action (added/removed).
-
-        Args:
-            changes: List of tag changes from the state manager
-
-        Returns:
-            Dictionary with collections as keys and action groups as values
-        """
-        by_collection: Dict[str, Dict[str, List[Dict[str, Any]]]] = defaultdict(lambda: {"added": [], "removed": []})
+    def _format_changes_by_collection(
+        changes: List[Dict[str, Any]]
+    ) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
+        """Group changes by collection and action (added/removed)."""
+        by_collection: Dict[str, Dict[str, List[Dict[str, Any]]]] = defaultdict(
+            lambda: {"added": [], "removed": []})
 
         for change in changes:
             collection = change.get("collection", "unknown")
             action = change.get("action", "unknown")
-
             if action == "added":
                 by_collection[collection]["added"].append(change)
             elif action == "removed":
@@ -34,121 +40,37 @@ class NotificationFormatter:
         return dict(by_collection)
 
     @staticmethod
-    def _format_collection_changes(
-        collection_name: str,
-        added: List[Dict[str, Any]],
-        removed: List[Dict[str, Any]]
-    ) -> str:
-        """Format changes for a single collection.
-
-        Args:
-            collection_name: Collection name
-            added: List of added movies
-            removed: List of removed movies
-
-        Returns:
-            Formatted section for this collection
-        """
-        lines = [f"### {collection_name}", ""]
-
-        if not added and not removed:
-            lines.append("No changes")
-            return "\n".join(lines)
-
-        if added:
-            lines.append(f"**Added**: {len(added)}")
-            for movie in added:
-                lines.append(f"- {movie.get('title')} ({movie.get('movie_id')})")
-            lines.append("")
-
-        if removed:
-            lines.append(f"**Removed**: {len(removed)}")
-            for movie in removed:
-                lines.append(f"- {movie.get('title')} ({movie.get('movie_id')})")
-            lines.append("")
-
-        return "\n".join(lines)
+    def _summary_rows(changes: List[Dict[str, Any]]) -> List[Tuple[str, int, int]]:
+        """One (collection, added_count, removed_count) row per changed
+        collection, sorted by name — the at-a-glance summary table."""
+        by_collection = NotificationFormatter._format_changes_by_collection(changes)
+        return [
+            (name, len(groups["added"]), len(groups["removed"]))
+            for name, groups in sorted(by_collection.items())
+        ]
 
     @staticmethod
-    def _format_errors(errors: List[Dict[str, Any]]) -> str:
-        """Format error information.
-
-        Args:
-            errors: List of errors from the state manager
-
-        Returns:
-            Formatted error section
-        """
-        if not errors:
-            return "No errors encountered"
-
-        lines = []
-
-        # Group errors by context
-        context_errors = defaultdict(list)
-        for error in errors:
-            context = error.get("context", "unknown")
-            context_errors[context].append(error)
-
-        # Format each context group
-        for context, error_list in context_errors.items():
-            lines.append(f"### {context}")
-            lines.append("")
-            for error in error_list:
-                timestamp = error.get("timestamp", "").split("T")[0]  # Just date part
-                message = error.get("message", "Unknown error")
-                lines.append(f"- {timestamp}: {message}")
-            lines.append("")
-
-        return "\n".join(lines)
+    def _totals(collection_stats: Optional[Dict[str, Dict[str, Any]]]) -> Tuple[int, float]:
+        """(movies processed, API cost) summed across collections this run."""
+        stats = collection_stats or {}
+        processed = sum(s.get("processed_movies", 0) for s in stats.values())
+        cost = sum(s.get("total_cost", 0.0) for s in stats.values())
+        return processed, cost
 
     @staticmethod
-    def _format_collection_stats(collection_stats: Dict[str, Dict[str, Any]]) -> str:
-        """Format processing statistics for collections.
+    def _counts(
+        changes: List[Dict[str, Any]],
+        changes_metadata: Optional[Dict[str, Any]],
+    ) -> Tuple[int, int, int, bool]:
+        """(total, added, removed, truncated) for the overview line."""
+        meta = changes_metadata or {}
+        truncated = bool(meta.get("truncated", False))
+        total = meta.get("total_count", len(changes))
+        added = sum(1 for c in changes if c.get("action") == "added")
+        removed = sum(1 for c in changes if c.get("action") == "removed")
+        return total, added, removed, truncated
 
-        Args:
-            collection_stats: Statistics from the movie processor
-
-        Returns:
-            Formatted stats section
-        """
-        if not collection_stats:
-            return "No statistics available"
-
-        lines = []
-
-        total_processed = 0
-        total_cost = 0.0
-        total_input_tokens = 0
-        total_output_tokens = 0
-        collections_processed = 0
-
-        for collection, stats in collection_stats.items():
-            processed = stats.get("processed_movies", 0)
-            from_cache = stats.get("from_cache", 0)
-            cost = stats.get("total_cost", 0.0)
-
-            lines.append(f"### {collection}")
-            lines.append(f"- Processed: {processed} movies")
-            lines.append(f"- From cache: {from_cache} movies")
-            lines.append(f"- API cost: ${cost:.4f}")
-            lines.append("")
-
-            total_processed += processed
-            total_cost += cost
-            total_input_tokens += stats.get("total_input_tokens", 0)
-            total_output_tokens += stats.get("total_output_tokens", 0)
-            collections_processed += 1
-
-        # Add summary stats
-        lines.insert(0, "")
-        lines.insert(0, f"- Total cost: ${total_cost:.4f}")
-        lines.insert(0, f"- Total tokens: {total_input_tokens + total_output_tokens}")
-        lines.insert(0, f"- Collections processed: {collections_processed}")
-        lines.insert(0, f"- Total processed: {total_processed} movies")
-        lines.insert(0, "### Summary")
-
-        return "\n".join(lines)
+    # ---- plain text ----------------------------------------------------
 
     @staticmethod
     def format_summary(
@@ -157,119 +79,178 @@ class NotificationFormatter:
         next_run_time: Optional[datetime] = None,
         collection_stats: Optional[Dict[str, Dict[str, Any]]] = None,
         version: str = "unknown",
-        changes_metadata: Optional[Dict[str, Any]] = None
+        changes_metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """Format a summary email with changes, errors, and processing statistics.
+        """Plain-text summary (no Markdown syntax, so it reads cleanly in a
+        text-only client)."""
+        total, added, removed, truncated = NotificationFormatter._counts(
+            changes, changes_metadata)
+        rows = NotificationFormatter._summary_rows(changes)
+        processed, cost = NotificationFormatter._totals(collection_stats)
 
-        Args:
-            changes: List of tag changes from the state manager
-            errors: List of errors from the state manager
-            next_run_time: Next scheduled run time
-            collection_stats: Processing statistics from the movie processor
-            version: Application version
-            changes_metadata: Metadata about changes, including total count if truncated
+        lines: List[str] = [f"Kometa-AI Report (v{version})", "=" * 44, ""]
 
-        Returns:
-            Formatted email body in Markdown format
-        """
-        lines = [f"# Kometa-AI Summary (v{version})", ""]
-
-        # Summary section
-        has_changes = len(changes) > 0
-        has_errors = len(errors) > 0
-        
-        # Check if changes were truncated
-        changes_truncated = changes_metadata and changes_metadata.get('truncated', False)
-        total_changes = changes_metadata.get('total_count', len(changes)) if changes_metadata else len(changes)
-
-        lines.append("## Overview")
-        lines.append("")
-        
-        if changes_truncated:
-            lines.append(f"- Total changes: {total_changes} (showing the most recent {len(changes)})")
-        else:
-            lines.append(f"- Total changes: {total_changes}")
-            
-        lines.append(f"- Errors: {len(errors)}")
-
+        overview = f"{total} changes (+{added}/-{removed})"
+        if truncated:
+            overview += f" [showing most recent {len(changes)}]"
+        overview += f"  |  {len(errors)} errors"
         if next_run_time:
-            formatted_time = next_run_time.strftime("%Y-%m-%d %H:%M:%S")
-            lines.append(f"- Next scheduled run: {formatted_time}")
-
+            overview += f"  |  next run {next_run_time.strftime('%Y-%m-%d %H:%M')}"
+        lines.append(overview)
         lines.append("")
 
-        # Changes by collection
-        if has_changes:
-            lines.append("## Changes by Collection")
+        # At-a-glance table
+        if rows:
+            name_w = max(10, max(len(name) for name, _, _ in rows))
+            lines.append(f"{'Collection'.ljust(name_w)}   Added  Removed")
+            for name, a, r in rows:
+                a_txt = f"+{a}" if a else "0"
+                r_txt = f"-{r}" if r else "0"
+                lines.append(f"{name.ljust(name_w)}   {a_txt.rjust(5)}  {r_txt.rjust(7)}")
             lines.append("")
 
+        # Per-collection detail
+        if changes:
+            lines.append("-- Changes --")
+            lines.append("")
             by_collection = NotificationFormatter._format_changes_by_collection(changes)
+            for name in sorted(by_collection):
+                lines.append(name)
+                for m in by_collection[name]["added"]:
+                    lines.append(f"  + {m.get('title')} ({m.get('movie_id')})")
+                for m in by_collection[name]["removed"]:
+                    lines.append(f"  - {m.get('title')} ({m.get('movie_id')})")
+                lines.append("")
 
-            for collection, actions in by_collection.items():
-                collection_section = NotificationFormatter._format_collection_changes(
-                    collection, actions["added"], actions["removed"]
-                )
-                lines.append(collection_section)
-        else:
-            lines.append("## Changes")
+        # Errors
+        if errors:
+            lines.append("-- Errors --")
             lines.append("")
-            lines.append("No changes were made in this run")
+            for err in errors:
+                ts = (err.get("timestamp", "") or "").split("T")[0]
+                lines.append(
+                    f"  {ts}: {err.get('message', 'Unknown error')} "
+                    f"[{err.get('context', 'unknown')}]")
             lines.append("")
 
-        # Errors section
-        lines.append("## Errors")
-        lines.append("")
-        error_section = NotificationFormatter._format_errors(errors)
-        lines.append(error_section)
-        lines.append("")
-
-        # Processing stats
-        if collection_stats:
-            lines.append("## Processing Statistics")
-            lines.append("")
-            stats_section = NotificationFormatter._format_collection_stats(collection_stats)
-            lines.append(stats_section)
-            lines.append("")
+        # Compact footer (replaces the old verbose per-collection stats dump)
+        cost_txt = f"${cost:.4f}" if cost else "subscription ($0)"
+        lines.append("-" * 44)
+        lines.append(f"Processed {processed} movies  |  {cost_txt}")
 
         return "\n".join(lines)
+
+    # ---- HTML ----------------------------------------------------------
+
+    @staticmethod
+    def format_summary_html(
+        changes: List[Dict[str, Any]],
+        errors: List[Dict[str, Any]],
+        next_run_time: Optional[datetime] = None,
+        collection_stats: Optional[Dict[str, Dict[str, Any]]] = None,
+        version: str = "unknown",
+        changes_metadata: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Outlook-safe HTML summary — table layout, inline styles only, no
+        external resources."""
+        total, added, removed, truncated = NotificationFormatter._counts(
+            changes, changes_metadata)
+        rows = NotificationFormatter._summary_rows(changes)
+        processed, cost = NotificationFormatter._totals(collection_stats)
+        esc = html_lib.escape
+
+        p: List[str] = [
+            '<div style="font-family:Arial,Helvetica,sans-serif;color:#111;max-width:640px;">',
+            '<h2 style="margin:0 0 4px;font-size:18px;">Kometa-AI Report</h2>',
+        ]
+
+        overview = (
+            f'<span style="color:{_GREEN};">+{added}</span> / '
+            f'<span style="color:{_RED};">-{removed}</span> '
+            f'<span style="color:{_MUTE};">({total} changes)</span>'
+        )
+        if truncated:
+            overview += f' <span style="color:{_MUTE};">— most recent {len(changes)}</span>'
+        overview += f' &nbsp;&middot;&nbsp; {len(errors)} errors'
+        if next_run_time:
+            overview += f' &nbsp;&middot;&nbsp; next run {next_run_time.strftime("%Y-%m-%d %H:%M")}'
+        p.append(f'<p style="margin:0 0 16px;color:{_MUTE};font-size:13px;">{overview}</p>')
+
+        if rows:
+            p.append('<table cellpadding="6" cellspacing="0" '
+                     'style="border-collapse:collapse;font-size:14px;margin-bottom:16px;">')
+            p.append(
+                f'<tr><th align="left" style="border-bottom:2px solid {_BORDER};">Collection</th>'
+                f'<th align="right" style="border-bottom:2px solid {_BORDER};">Added</th>'
+                f'<th align="right" style="border-bottom:2px solid {_BORDER};">Removed</th></tr>')
+            for name, a, r in rows:
+                a_html = (f'<span style="color:{_GREEN};">+{a}</span>' if a
+                          else f'<span style="color:{_ZERO};">0</span>')
+                r_html = (f'<span style="color:{_RED};">-{r}</span>' if r
+                          else f'<span style="color:{_ZERO};">0</span>')
+                p.append(
+                    f'<tr><td style="border-bottom:1px solid {_BORDER};">{esc(name)}</td>'
+                    f'<td align="right" style="border-bottom:1px solid {_BORDER};">{a_html}</td>'
+                    f'<td align="right" style="border-bottom:1px solid {_BORDER};">{r_html}</td></tr>')
+            p.append('</table>')
+
+        if changes:
+            by_collection = NotificationFormatter._format_changes_by_collection(changes)
+            for name in sorted(by_collection):
+                p.append(f'<h3 style="margin:12px 0 4px;font-size:15px;">{esc(name)}</h3>')
+                p.append('<ul style="margin:0 0 8px;padding-left:20px;font-size:13px;">')
+                for m in by_collection[name]["added"]:
+                    p.append(
+                        f'<li style="color:{_GREEN};">+ {esc(str(m.get("title")))} '
+                        f'<span style="color:{_MUTE};">({m.get("movie_id")})</span></li>')
+                for m in by_collection[name]["removed"]:
+                    p.append(
+                        f'<li style="color:{_RED};">&minus; {esc(str(m.get("title")))} '
+                        f'<span style="color:{_MUTE};">({m.get("movie_id")})</span></li>')
+                p.append('</ul>')
+
+        if errors:
+            p.append(f'<h3 style="margin:12px 0 4px;font-size:15px;color:{_RED};">Errors</h3>')
+            p.append('<ul style="margin:0 0 8px;padding-left:20px;font-size:13px;">')
+            for err in errors:
+                ts = (err.get("timestamp", "") or "").split("T")[0]
+                p.append(
+                    f'<li>{esc(ts)}: {esc(str(err.get("message", "Unknown error")))} '
+                    f'<span style="color:{_MUTE};">[{esc(str(err.get("context", "unknown")))}]</span></li>')
+            p.append('</ul>')
+
+        cost_txt = f"${cost:.4f}" if cost else "subscription ($0)"
+        p.append(
+            f'<p style="margin-top:16px;padding-top:8px;border-top:1px solid {_BORDER};'
+            f'color:{_MUTE};font-size:12px;">Processed {processed} movies &middot; '
+            f'{cost_txt} &middot; v{esc(version)}</p>')
+        p.append('</div>')
+
+        return "\n".join(p)
 
     @staticmethod
     def format_error_notification(
         error_context: str,
         error_message: str,
         traceback: Optional[str] = None,
-        version: str = "unknown"
+        version: str = "unknown",
     ) -> str:
-        """Format an error notification for critical errors.
-
-        Args:
-            error_context: Context where the error occurred
-            error_message: Error message
-            traceback: Optional traceback
-            version: Application version
-
-        Returns:
-            Formatted error notification in Markdown format
-        """
-        lines = [f"# Kometa-AI Error Report (v{version})", ""]
-
-        lines.append(f"## Error in {error_context}")
-        lines.append("")
-        lines.append(f"**Error message**: {error_message}")
-        lines.append("")
+        """Plain-text critical-error notification (used for a pipeline crash,
+        separate from the per-run summary)."""
+        lines = [
+            f"Kometa-AI Error Report (v{version})",
+            "=" * 44,
+            "",
+            f"Error in {error_context}",
+            "",
+            f"Message: {error_message}",
+            "",
+        ]
 
         if traceback:
-            lines.append("## Traceback")
-            lines.append("")
-            lines.append("```")
+            lines.append("Traceback:")
             lines.append(traceback)
-            lines.append("```")
             lines.append("")
 
-        lines.append("## System Information")
-        lines.append("")
-        lines.append(f"- Version: {version}")
-        lines.append(f"- Timestamp: {datetime.now().isoformat()}")
-        lines.append("")
-
+        lines.append(f"Timestamp: {datetime.now().isoformat()}")
         return "\n".join(lines)

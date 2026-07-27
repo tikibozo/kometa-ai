@@ -180,13 +180,14 @@ class MockEmailNotifier(EmailNotifier):
     def can_send(self):
         return self.can_send_result
         
-    def send_notification(self, subject, message):
+    def send_notification(self, subject, message, html_message=None):
         if not self.can_send():
             return False
-            
+
         self.emails_sent.append({
             "subject": subject,
             "message": message,
+            "html_message": html_message,
             "timestamp": datetime.now().isoformat()
         })
         return self.send_result

@@ -77,12 +77,20 @@ class EmailNotifier:
 
         return self.send_on_no_changes
 
-    def send_notification(self, subject: str, message: str) -> bool:
+    def send_notification(
+        self,
+        subject: str,
+        message: str,
+        html_message: Optional[str] = None,
+    ) -> bool:
         """Send an email notification.
 
         Args:
             subject: Email subject
-            message: Email message (supports Markdown formatting)
+            message: Plain-text email body
+            html_message: Optional HTML body. When provided it is attached as
+                the preferred alternative, so HTML-capable clients (Outlook)
+                render it while text-only clients fall back to `message`.
 
         Returns:
             True if sent successfully, False otherwise
@@ -92,7 +100,8 @@ class EmailNotifier:
             return False
 
         try:
-            # Create a multipart email
+            # multipart/alternative: least-preferred part first (plain), most-
+            # preferred last (HTML) — clients render the last part they support.
             msg = MIMEMultipart('alternative')
             msg['Subject'] = subject
             msg['From'] = self.from_address
@@ -100,11 +109,9 @@ class EmailNotifier:
             msg['To'] = ', '.join(self.recipients)
             msg['Date'] = datetime.now().strftime('%a, %d %b %Y %H:%M:%S %z')
 
-            # Add plain text and HTML parts
-            # For simplicity, we're using the same content for both
-            # In a production system, we might want to convert Markdown to HTML
-            text_part = MIMEText(message, 'plain')
-            msg.attach(text_part)
+            msg.attach(MIMEText(message, 'plain'))
+            if html_message:
+                msg.attach(MIMEText(html_message, 'html'))
 
             # Connect to SMTP server
             # Type note: We use Union[SMTP, SMTP_SSL] for server variable
@@ -140,14 +147,16 @@ class EmailNotifier:
                     subject: str,
                     message: str,
                     has_changes: bool = False,
-                    has_errors: bool = False) -> bool:
+                    has_errors: bool = False,
+                    html_message: Optional[str] = None) -> bool:
         """Send a summary email if conditions are met.
 
         Args:
             subject: Email subject
-            message: Email message
+            message: Plain-text email body
             has_changes: Whether there are any changes to report
             has_errors: Whether there are any errors to report
+            html_message: Optional HTML body (preferred alternative)
 
         Returns:
             True if sent successfully, False otherwise
@@ -156,4 +165,4 @@ class EmailNotifier:
             logger.info("No changes or errors to report, skipping notification")
             return False
 
-        return self.send_notification(subject, message)
+        return self.send_notification(subject, message, html_message)
