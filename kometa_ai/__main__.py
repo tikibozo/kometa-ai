@@ -449,20 +449,23 @@ def send_notifications(
         f"{len(recent_errors)} errors"
     )
 
-    message = NotificationFormatter.format_summary(
+    formatter_args = dict(
         changes=recent_changes,
         errors=recent_errors,
         next_run_time=next_run_time,
         collection_stats=results.get("collection_stats", {}),
         version=__version__,
-        changes_metadata=changes_metadata
+        changes_metadata=changes_metadata,
     )
+    message = NotificationFormatter.format_summary(**formatter_args)
+    html_message = NotificationFormatter.format_summary_html(**formatter_args)
 
     # Send notification
     recipients_str = ", ".join(email_notifier.recipients)
     logger.info(f"Sending notification email to {recipients_str}...")
 
-    sent = email_notifier.send_notification(subject=subject, message=message)
+    sent = email_notifier.send_notification(
+        subject=subject, message=message, html_message=html_message)
 
     if sent:
         logger.info("Notification email sent successfully")

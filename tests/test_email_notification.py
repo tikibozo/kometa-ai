@@ -303,172 +303,96 @@ class TestNotificationFormatter:
         assert result["Action"]["removed"][0]["title"] == "Movie 2"
         assert result["Drama"]["added"][0]["title"] == "Movie 3"
     
-    def test_format_collection_changes(self):
-        """Test _format_collection_changes."""
-        # Sample changes
-        added = [
-            {"title": "Movie 1", "movie_id": 1},
-            {"title": "Movie 2", "movie_id": 2}
+    def test_summary_rows(self):
+        """_summary_rows returns one (collection, added, removed) row per
+        changed collection, sorted by name."""
+        changes = [
+            {"collection": "Drama", "action": "added", "title": "M3", "movie_id": 3},
+            {"collection": "Action", "action": "added", "title": "M1", "movie_id": 1},
+            {"collection": "Action", "action": "removed", "title": "M2", "movie_id": 2},
         ]
-        removed = [
-            {"title": "Movie 3", "movie_id": 3}
-        ]
-        
-        # Format collection changes
-        result = NotificationFormatter._format_collection_changes("Action", added, removed)
-        
-        # Verify format
-        assert "### Action" in result
-        assert "**Added**: 2" in result
-        assert "**Removed**: 1" in result
-        assert "- Movie 1 (1)" in result
-        assert "- Movie 2 (2)" in result
-        assert "- Movie 3 (3)" in result
-        
-        # Test with no changes
-        result = NotificationFormatter._format_collection_changes("Empty", [], [])
-        assert "### Empty" in result
-        assert "No changes" in result
-    
-    def test_format_errors(self):
-        """Test _format_errors."""
-        # Sample errors
-        errors = [
-            {"context": "collection:Action", "timestamp": "2023-01-01T12:00:00Z", "message": "Error 1"},
-            {"context": "collection:Action", "timestamp": "2023-01-01T13:00:00Z", "message": "Error 2"},
-            {"context": "collection:Drama", "timestamp": "2023-01-01T14:00:00Z", "message": "Error 3"}
-        ]
-        
-        # Format errors
-        result = NotificationFormatter._format_errors(errors)
-        
-        # Verify format
-        assert "### collection:Action" in result
-        assert "### collection:Drama" in result
-        assert "- 2023-01-01: Error 1" in result
-        assert "- 2023-01-01: Error 2" in result
-        assert "- 2023-01-01: Error 3" in result
-        
-        # Test with no errors
-        result = NotificationFormatter._format_errors([])
-        assert "No errors encountered" in result
-    
-    def test_format_collection_stats(self):
-        """Test _format_collection_stats."""
-        # Sample stats
-        stats = {
-            "Action": {
-                "processed_movies": 10,
-                "from_cache": 5,
-                "total_input_tokens": 1000,
-                "total_output_tokens": 500,
-                "total_cost": 0.01
-            },
-            "Drama": {
-                "processed_movies": 20,
-                "from_cache": 10,
-                "total_input_tokens": 2000,
-                "total_output_tokens": 1000,
-                "total_cost": 0.02
-            }
-        }
-        
-        # Format stats
-        result = NotificationFormatter._format_collection_stats(stats)
-        
-        # Verify format
-        assert "### Summary" in result
-        assert "### Action" in result
-        assert "### Drama" in result
-        assert "- Total processed: 30 movies" in result
-        assert "- Collections processed: 2" in result
-        assert "- Total cost: $0.0300" in result
-        assert "- Processed: 10 movies" in result
-        assert "- From cache: 5 movies" in result
-        assert "- API cost: $0.0100" in result
-        
-        # Test with no stats
-        result = NotificationFormatter._format_collection_stats({})
-        assert "No statistics available" in result
-    
+        rows = NotificationFormatter._summary_rows(changes)
+        assert rows == [("Action", 1, 1), ("Drama", 1, 0)]
+
     def test_format_summary(self):
-        """Test format_summary."""
-        # Sample data
+        """Plain-text summary: overview line, at-a-glance table, detail, and a
+        compact footer — no Markdown syntax."""
         changes = [
             {"collection": "Action", "action": "added", "title": "Movie 1", "movie_id": 1},
-            {"collection": "Drama", "action": "added", "title": "Movie 2", "movie_id": 2}
+            {"collection": "Action", "action": "removed", "title": "Movie 2", "movie_id": 2},
+            {"collection": "Drama", "action": "added", "title": "Movie 3", "movie_id": 3},
         ]
         errors = [
             {"context": "collection:Action", "timestamp": "2023-01-01T12:00:00Z", "message": "Error 1"}
         ]
         next_run_time = datetime(2023, 1, 2, 3, 0, 0)
-        stats = {
-            "Action": {
-                "processed_movies": 10,
-                "from_cache": 5,
-                "total_cost": 0.01
-            }
-        }
-        
-        # Format summary
+        stats = {"Action": {"processed_movies": 10, "from_cache": 5, "total_cost": 0.01}}
+
         result = NotificationFormatter.format_summary(
-            changes=changes,
-            errors=errors,
-            next_run_time=next_run_time,
-            collection_stats=stats,
-            version="1.0.0"
+            changes=changes, errors=errors, next_run_time=next_run_time,
+            collection_stats=stats, version="1.0.0",
         )
-        
-        # Verify format
-        assert "# Kometa-AI Summary (v1.0.0)" in result
-        assert "## Overview" in result
-        assert "- Total changes: 2 (+2/-0)" in result
-        assert "- Errors: 1" in result
-        assert "- Next scheduled run: 2023-01-02 03:00:00" in result
-        assert "## Changes by Collection" in result
-        assert "## Errors" in result
-        assert "## Processing Statistics" in result
-        
-        # Test without changes
+        assert "Kometa-AI Report (v1.0.0)" in result
+        assert "3 changes (+2/-1)" in result
+        assert "1 errors" in result
+        assert "next run 2023-01-02 03:00" in result
+        assert "+ Movie 1 (1)" in result
+        assert "- Movie 2 (2)" in result
+        assert "-- Errors --" in result and "Error 1" in result
+        assert "Processed 10 movies" in result
+        assert "$0.0100" in result
+        # no leftover Markdown noise
+        assert "## " not in result
+        assert "**" not in result
+
+    def test_format_summary_truncated(self):
+        """Overview shows the truncation note when >500 changes in one run."""
+        changes = [
+            {"collection": "C", "action": "added", "title": f"M{i}", "movie_id": i}
+            for i in range(3)
+        ]
+        meta = {"truncated": True, "total_count": 620}
         result = NotificationFormatter.format_summary(
-            changes=[],
-            errors=[],
-            next_run_time=next_run_time,
-            version="1.0.0"
+            changes=changes, errors=[], version="1.0.0", changes_metadata=meta)
+        assert "620 changes" in result
+        assert "showing most recent 3" in result
+
+    def test_format_summary_html(self):
+        """HTML summary: table layout, inline color styles, escaping, no scripts."""
+        changes = [
+            {"collection": "Action", "action": "added", "title": "Movie <1>", "movie_id": 1},
+            {"collection": "Action", "action": "removed", "title": "Movie 2", "movie_id": 2},
+        ]
+        result = NotificationFormatter.format_summary_html(
+            changes=changes, errors=[], version="1.0.0",
+            collection_stats={"Action": {"processed_movies": 10, "total_cost": 0.0}},
         )
-        assert "# Kometa-AI Summary (v1.0.0)" in result
-        assert "No changes were made in this run" in result
-    
+        assert result.startswith("<div")
+        assert "<table" in result and "</table>" in result
+        assert "Kometa-AI Report" in result
+        assert "#1a7f37" in result  # green for added
+        assert "#c9252d" in result  # red for removed
+        # title HTML-escaped, no raw angle brackets or scripts
+        assert "Movie &lt;1&gt;" in result
+        assert "<script" not in result
+        assert "Processed 10 movies" in result
+        assert "subscription ($0)" in result
+
     def test_format_error_notification(self):
-        """Test format_error_notification."""
-        # Format error notification
+        """Plain-text critical-error notification."""
         result = NotificationFormatter.format_error_notification(
-            error_context="test_context",
-            error_message="Test error message",
-            traceback="Traceback: line 1\n  line 2\n  line 3",
-            version="1.0.0"
+            error_context="test_context", error_message="Test error message",
+            traceback="Traceback: line 1\n  line 2", version="1.0.0",
         )
-        
-        # Verify format
-        assert "# Kometa-AI Error Report (v1.0.0)" in result
-        assert "## Error in test_context" in result
-        assert "**Error message**: Test error message" in result
-        assert "## Traceback" in result
-        assert "```" in result
+        assert "Kometa-AI Error Report (v1.0.0)" in result
+        assert "Error in test_context" in result
+        assert "Test error message" in result
         assert "Traceback: line 1" in result
-        assert "## System Information" in result
-        assert "- Version: 1.0.0" in result
-        
-        # Test without traceback
+
         result = NotificationFormatter.format_error_notification(
-            error_context="test_context",
-            error_message="Test error message",
-            version="1.0.0"
-        )
-        assert "# Kometa-AI Error Report (v1.0.0)" in result
-        assert "## Error in test_context" in result
-        assert "**Error message**: Test error message" in result
-        assert "## Traceback" not in result
+            error_context="test_context", error_message="Test error message", version="1.0.0")
+        assert "Kometa-AI Error Report (v1.0.0)" in result
+        assert "Traceback:" not in result
 
 
 if __name__ == "__main__":
