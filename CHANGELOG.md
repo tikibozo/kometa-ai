@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/tikibozo/kometa-ai/compare/v0.4.1...v0.4.2) (2026-07-27)
+
+
+### Bug Fixes
+
+* accurate change count + HTML status email ([#24](https://github.com/tikibozo/kometa-ai/issues/24)) ([09fa508](https://github.com/tikibozo/kometa-ai/commit/09fa508365dbce7da822ff3130152e52fbc7fa4f))
+
 ## [0.4.1](https://github.com/tikibozo/kometa-ai/compare/v0.4.0...v0.4.1) (2026-07-14)
 
 
