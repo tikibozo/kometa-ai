@@ -371,6 +371,34 @@ def process_collections(
             f"they will be processed on subsequent runs"
         )
 
+    # Per-collection completeness for the status email: how many candidates have
+    # been judged vs are still pending (never evaluated), plus the current member
+    # count. Lets the report show "current" vs "backfilling (N pending)".
+    collection_status: Dict[str, Dict[str, int]] = {}
+    for collection in collections:
+        if not collection.enabled:
+            continue
+        candidates = [m for m in all_movies if collection.is_candidate(m)]
+        evaluated = 0
+        members = 0
+        for movie in candidates:
+            decision = state_manager.get_decision(movie.id, collection.name)
+            if decision is not None:
+                evaluated += 1
+                if decision.include and decision.confidence >= collection.confidence_threshold:
+                    members += 1
+        collection_status[collection.name] = {
+            "members": members,
+            "candidates": len(candidates),
+            "evaluated": evaluated,
+            "pending": len(candidates) - evaluated,
+        }
+    results["collection_status"] = collection_status
+    results["deferred"] = total_deferred
+    results["usage_limited"] = processor.usage_limited
+    results["evals_used"] = processor.evals_used
+    results["max_evals_per_run"] = processor.max_evals_per_run
+
     # Generate summary with more details
     error_count = len(results['errors'])
     if error_count > 0:
@@ -423,9 +451,26 @@ def send_notifications(
     has_changes = len(recent_changes) > 0
     has_errors = len(recent_errors) > 0
 
-    if not email_notifier.should_send(
-            has_changes=has_changes, has_errors=has_errors):
-        logger.info("No changes or errors to report, skipping notification")
+    # Run/completeness status — so the report also fires (and shows the backlog)
+    # when a run only defers work to quota/budget without changing any tags.
+    collection_status = results.get("collection_status", {})
+    run_status = {
+        "deferred": results.get("deferred", 0),
+        "usage_limited": results.get("usage_limited", False),
+        "evals_used": results.get("evals_used", 0),
+        "max_evals_per_run": results.get("max_evals_per_run", 0),
+    }
+    has_backlog = (
+        any(s.get("pending", 0) for s in collection_status.values())
+        or bool(run_status["deferred"])
+        or bool(run_status["usage_limited"])
+    )
+
+    if not (email_notifier.should_send(has_changes=has_changes, has_errors=has_errors)
+            or has_backlog):
+        logger.info(
+            "Nothing to report (no changes, errors, or pending work); "
+            "skipping notification")
         return False
 
     logger.info(
@@ -449,6 +494,11 @@ def send_notifications(
         f"Kometa-AI Processing Report: {change_desc}, "
         f"{len(recent_errors)} errors"
     )
+    total_pending = sum(s.get("pending", 0) for s in collection_status.values())
+    if run_status["usage_limited"]:
+        subject += " — quota limit hit"
+    elif total_pending:
+        subject += f" — {total_pending} pending"
 
     formatter_args = dict(
         changes=recent_changes,
@@ -457,6 +507,8 @@ def send_notifications(
         collection_stats=results.get("collection_stats", {}),
         version=__version__,
         changes_metadata=changes_metadata,
+        collection_status=collection_status,
+        run_status=run_status,
     )
     message = NotificationFormatter.format_summary(**formatter_args)
     html_message = NotificationFormatter.format_summary_html(**formatter_args)

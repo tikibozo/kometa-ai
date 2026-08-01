@@ -70,6 +70,42 @@ class NotificationFormatter:
         removed = sum(1 for c in changes if c.get("action") == "removed")
         return total, added, removed, truncated
 
+    @staticmethod
+    def _status_rows(
+        collection_status: Optional[Dict[str, Dict[str, int]]]
+    ) -> List[Tuple[str, int, int, int, bool]]:
+        """(name, members, evaluated, pending, is_current) per collection,
+        most-backlog first then alphabetical — the completeness view."""
+        cs = collection_status or {}
+        rows = [
+            (name, s.get("members", 0), s.get("evaluated", 0),
+             s.get("pending", 0), s.get("pending", 0) == 0)
+            for name, s in cs.items()
+        ]
+        rows.sort(key=lambda r: (-r[3], r[0]))
+        return rows
+
+    @staticmethod
+    def _run_status_lines(run_status: Optional[Dict[str, Any]]) -> List[str]:
+        """Human-readable budget/quota lines for this run (possibly empty)."""
+        rs = run_status or {}
+        lines: List[str] = []
+        evals_used = rs.get("evals_used")
+        max_evals = rs.get("max_evals_per_run")
+        deferred = rs.get("deferred", 0)
+        if max_evals:
+            lines.append(f"Eval budget: {evals_used} of {max_evals} used this run")
+        elif evals_used:
+            lines.append(f"Evaluations this run: {evals_used}")
+        if deferred:
+            lines.append(
+                f"{deferred} candidate(s) deferred by the budget — resume next run")
+        if rs.get("usage_limited"):
+            lines.append(
+                "Claude usage/quota limit reached — run stopped early; "
+                "unprocessed work resumes next run")
+        return lines
+
     # ---- plain text ----------------------------------------------------
 
     @staticmethod
@@ -80,6 +116,8 @@ class NotificationFormatter:
         collection_stats: Optional[Dict[str, Dict[str, Any]]] = None,
         version: str = "unknown",
         changes_metadata: Optional[Dict[str, Any]] = None,
+        collection_status: Optional[Dict[str, Dict[str, int]]] = None,
+        run_status: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Plain-text summary (no Markdown syntax, so it reads cleanly in a
         text-only client)."""
@@ -107,6 +145,25 @@ class NotificationFormatter:
                 a_txt = f"+{a}" if a else "0"
                 r_txt = f"-{r}" if r else "0"
                 lines.append(f"{name.ljust(name_w)}   {a_txt.rjust(5)}  {r_txt.rjust(7)}")
+            lines.append("")
+
+        # Collection status — completeness / backfill backlog
+        status_rows = NotificationFormatter._status_rows(collection_status)
+        if status_rows:
+            lines.append("-- Collection Status --")
+            lines.append("")
+            name_w = max(10, max(len(n) for n, *_ in status_rows))
+            lines.append(f"{'Collection'.ljust(name_w)}   Members  Pending  Status")
+            for name, members, _evaluated, pending, current in status_rows:
+                state = "current" if current else "backfilling"
+                lines.append(
+                    f"{name.ljust(name_w)}   {str(members).rjust(7)}  "
+                    f"{str(pending).rjust(7)}  {state}")
+            lines.append("")
+        run_lines = NotificationFormatter._run_status_lines(run_status)
+        if run_lines:
+            for rl in run_lines:
+                lines.append(f"  {rl}")
             lines.append("")
 
         # Per-collection detail
@@ -150,6 +207,8 @@ class NotificationFormatter:
         collection_stats: Optional[Dict[str, Dict[str, Any]]] = None,
         version: str = "unknown",
         changes_metadata: Optional[Dict[str, Any]] = None,
+        collection_status: Optional[Dict[str, Dict[str, int]]] = None,
+        run_status: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Outlook-safe HTML summary — table layout, inline styles only, no
         external resources."""
@@ -193,6 +252,35 @@ class NotificationFormatter:
                     f'<td align="right" style="border-bottom:1px solid {_BORDER};">{a_html}</td>'
                     f'<td align="right" style="border-bottom:1px solid {_BORDER};">{r_html}</td></tr>')
             p.append('</table>')
+
+        # Collection status — completeness / backfill backlog
+        status_rows = NotificationFormatter._status_rows(collection_status)
+        if status_rows:
+            p.append('<h3 style="margin:16px 0 4px;font-size:15px;">Collection Status</h3>')
+            p.append('<table cellpadding="6" cellspacing="0" '
+                     'style="border-collapse:collapse;font-size:14px;margin-bottom:12px;">')
+            p.append(
+                f'<tr><th align="left" style="border-bottom:2px solid {_BORDER};">Collection</th>'
+                f'<th align="right" style="border-bottom:2px solid {_BORDER};">Members</th>'
+                f'<th align="right" style="border-bottom:2px solid {_BORDER};">Pending</th>'
+                f'<th align="left" style="border-bottom:2px solid {_BORDER};">Status</th></tr>')
+            for name, members, _evaluated, pending, current in status_rows:
+                if current:
+                    st = f'<span style="color:{_GREEN};">current</span>'
+                    pend_html = f'<span style="color:{_ZERO};">0</span>'
+                else:
+                    st = f'<span style="color:{_MUTE};">backfilling</span>'
+                    pend_html = f'<span style="color:{_MUTE};">{pending}</span>'
+                p.append(
+                    f'<tr><td style="border-bottom:1px solid {_BORDER};">{esc(name)}</td>'
+                    f'<td align="right" style="border-bottom:1px solid {_BORDER};">{members}</td>'
+                    f'<td align="right" style="border-bottom:1px solid {_BORDER};">{pend_html}</td>'
+                    f'<td style="border-bottom:1px solid {_BORDER};">{st}</td></tr>')
+            p.append('</table>')
+        run_lines = NotificationFormatter._run_status_lines(run_status)
+        if run_lines:
+            p.append(f'<p style="margin:0 0 16px;color:{_MUTE};font-size:13px;">'
+                     + '<br>'.join(esc(rl) for rl in run_lines) + '</p>')
 
         if changes:
             by_collection = NotificationFormatter._format_changes_by_collection(changes)
