@@ -6,6 +6,7 @@ import argparse
 import logging
 import time
 import json
+from contextlib import nullcontext
 from typing import List, Dict, Any, Optional, cast
 from datetime import datetime
 
@@ -564,8 +565,17 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
         if not load_collections():
             return 1
 
-        # Calculate next run time if not in run-now mode
-        if not args.run_now:
+        # A targeted invocation (--dry-run or --collection) is a manual one-shot:
+        # run once immediately and exit. Only the daemon (--run-now or bare
+        # scheduled mode) loops. This stops a stray validation/diagnostic run
+        # from becoming a rogue daemon that wakes on every schedule tick and
+        # competes with the real run for the run lock.
+        one_shot = bool(args.dry_run or args.collection)
+
+        # Calculate next run time if not in run-now mode. One-shot invocations
+        # skip the pre-run wait entirely — they must run immediately, not sleep
+        # until the next scheduled time.
+        if not args.run_now and not one_shot:
             next_run_time = calculate_schedule()
 
             # Sleep until next run time
@@ -590,7 +600,13 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
             # scheduled run and a manual --run-now exec can't overlap and clobber
             # each other's Radarr tags. If another run holds the lock, skip this
             # cycle and retry on the next schedule.
-            with acquire_run_lock(state_dir) as got_lock:
+            # A dry-run writes no Radarr tags, so it needs no lock — and must
+            # never hold one, or it would block a concurrent real run.
+            lock_ctx = (
+                nullcontext(True) if args.dry_run
+                else acquire_run_lock(state_dir)
+            )
+            with lock_ctx as got_lock:
                 if not got_lock:
                     results = None
                 else:
@@ -622,8 +638,13 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
                     )
 
             if results is None:
-                # Another run held the lock; nothing processed this cycle. Wait
-                # for the next scheduled run and try again.
+                # Another run held the lock; nothing processed this cycle.
+                if one_shot:
+                    logger.warning(
+                        "Another kometa-ai run holds the lock; one-shot run "
+                        "exiting without processing.")
+                    return 0
+                # Daemon: wait for the next scheduled run and try again.
                 next_run_time = calculate_schedule()
                 formatted_next = next_run_time.strftime("%Y-%m-%d %H:%M:%S")
                 logger.info(
@@ -659,6 +680,11 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
             if terminate_requested:
                 logger.info("Termination requested, exiting")
                 break
+
+            if one_shot:
+                logger.info(
+                    "One-shot run complete (--dry-run/--collection); exiting.")
+                return 0
 
             # Sleep until next run
             formatted_next = next_run_time.strftime("%Y-%m-%d %H:%M:%S")
