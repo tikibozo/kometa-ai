@@ -376,7 +376,7 @@ class KometaParser:
         Returns:
             List of collection configurations
         """
-        logger.info("Parsing AI collection configurations")
+        logger.debug("Parsing AI collection configurations")
         configs = {}
 
         for file_path in self.find_yaml_files():
@@ -414,7 +414,7 @@ class KometaParser:
 
         # Filter to only enabled collections
         enabled_configs = [config for config in result if config.enabled]
-        logger.info(f"Found {len(enabled_configs)} enabled AI collections out of {len(result)} total")
+        logger.info(f"Found {len(enabled_configs)} enabled out of {len(result)} total AI collections")
 
         # Sort by priority (higher first)
         enabled_configs.sort(key=lambda x: x.priority, reverse=True)

@@ -197,7 +197,7 @@ class RadarrClient:
         Returns:
             List of tags
         """
-        logger.info("Fetching tags from Radarr")
+        logger.debug("Fetching tags from Radarr")
         response = self._make_request('GET', '/tag')
         tags_data = response.json()
 
@@ -261,7 +261,7 @@ class RadarrClient:
         Raises:
             requests.RequestException: If the update fails
         """
-        logger.info(f"Updating movie {movie.id} in Radarr")
+        logger.debug(f"Updating movie {movie.id} in Radarr")
         movie_data = movie.to_dict()
         response = self._make_request('PUT', f'/movie/{movie.id}', json_data=movie_data)
         updated_movie_data = response.json()
@@ -375,7 +375,7 @@ class RadarrClient:
             True if connection is successful, False otherwise
         """
         try:
-            logger.info(f"Testing connection to Radarr API at {self.base_url}")
+            logger.debug(f"Testing connection to Radarr API at {self.base_url}")
             response = self._make_request('GET', '/system/status')
             data = response.json()
             logger.info(f"Successfully connected to Radarr API (version: {data.get('version', 'unknown')})")

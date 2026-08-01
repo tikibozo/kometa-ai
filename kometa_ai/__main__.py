@@ -100,7 +100,7 @@ def run_health_check() -> bool:
             return False
 
         # Check Radarr connectivity
-        logger.info("Checking Radarr connectivity...")
+        logger.debug("Checking Radarr connectivity...")
         radarr_client = RadarrClient(radarr_url, radarr_api_key)
         if not radarr_client.test_connection():
             logger.error("Failed to connect to Radarr API")
@@ -109,7 +109,7 @@ def run_health_check() -> bool:
 
 
         # Check Kometa configuration
-        logger.info("Checking Kometa configuration...")
+        logger.debug("Checking Kometa configuration...")
         kometa_config_dir = os.path.join(os.getcwd(), "kometa-config")
         if not os.path.exists(kometa_config_dir):
             logger.error(
@@ -119,13 +119,13 @@ def run_health_check() -> bool:
         logger.info("Kometa configuration directory exists")
 
         # Check state directory
-        logger.info("Checking state directory...")
+        logger.debug("Checking state directory...")
         state_dir = os.path.join(os.getcwd(), "state")
         os.makedirs(state_dir, exist_ok=True)
         logger.info("State directory exists or was created")
 
         # Check for email configuration (optional)
-        logger.info("Checking email configuration...")
+        logger.debug("Checking email configuration...")
         smtp_server = Config.get("SMTP_SERVER", "")
         if not smtp_server:
             logger.warning(
@@ -134,7 +134,7 @@ def run_health_check() -> bool:
             logger.info("Email configuration found")
 
         # Check schedule configuration
-        logger.info("Checking schedule configuration...")
+        logger.debug("Checking schedule configuration...")
         schedule_interval = Config.get("SCHEDULE_INTERVAL", "")
         schedule_start_time = Config.get("SCHEDULE_START_TIME", "")
 
@@ -222,11 +222,11 @@ def process_collections(
     # Use provided movies or fetch them if not provided
     if all_movies is None:
         # Fetch movies once to minimize API calls
-        logger.info("Fetching movies from Radarr")
+        logger.debug("Fetching movies from Radarr")
         all_movies = radarr_client.get_movies()
-        logger.info(f"Retrieved {len(all_movies)} movies from Radarr")
+        logger.debug(f"Retrieved {len(all_movies)} movies from Radarr")
     else:
-        logger.info(f"Using {len(all_movies)} movies already fetched from Radarr")
+        logger.debug(f"Using {len(all_movies)} movies already fetched from Radarr")
 
     # Create tag manager
     tag_manager = TagManager(radarr_client)
@@ -262,14 +262,13 @@ def process_collections(
                 "Termination requested, stopping collection processing")
             break
 
-        logger.info(
+        logger.debug(
             f"Processing collection '{collection.name}'...")
 
         try:
             # Classify movies for this collection
-            logger.info(
-                f"Classifying movies for '{collection.name}' "
-                f"with Claude AI...")
+            logger.debug(
+                f"Classifying movies for '{collection.name}'")
             included_ids, excluded_ids, stats = processor.process_collection(
                 collection=collection,
                 movies=all_movies
@@ -280,7 +279,7 @@ def process_collections(
 
             # Apply tag changes
             if not dry_run:
-                logger.info(
+                logger.debug(
                     f"Applying tag changes for collection '{collection.name}'...")
                 # Pass no snapshot: reconcile refetches current tag state from
                 # Radarr so the diff reflects reality at write time, not the
@@ -443,7 +442,7 @@ def send_notifications(
         return False
 
     # Get changes and errors from state for notification
-    logger.info("Preparing email notification...")
+    logger.debug("Preparing email notification...")
     recent_changes = state_manager.get_changes()
     recent_errors = state_manager.get_errors()
 
@@ -515,7 +514,7 @@ def send_notifications(
 
     # Send notification
     recipients_str = ", ".join(email_notifier.recipients)
-    logger.info(f"Sending notification email to {recipients_str}...")
+    logger.debug(f"Sending notification email to {recipients_str}...")
 
     sent = email_notifier.send_notification(
         subject=subject, message=message, html_message=html_message)
@@ -527,7 +526,7 @@ def send_notifications(
         state_manager.clear_changes()
         # Save state after clearing
         state_manager.save()
-        logger.info("Cleared error and change records from state after sending notification")
+        logger.debug("Cleared error and change records from state after sending notification")
     else:
         logger.error("Failed to send notification email")
 
@@ -585,7 +584,7 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
             return 1
 
         # RadarrClient retries connection errors with backoff internally
-        logger.info(f"Initializing Radarr client (URL: {radarr_url})...")
+        logger.debug(f"Initializing Radarr client (URL: {radarr_url})...")
         radarr_client = RadarrClient(radarr_url, radarr_api_key, max_retries=10)
         if not radarr_client.test_connection():
             logger.error(f"Failed to connect to Radarr at {radarr_url}")
@@ -600,7 +599,7 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
         kometa_parser = KometaParser(kometa_config_dir)
 
         def load_collections():
-            logger.info("Loading collection configurations...")
+            logger.debug("Loading collection configurations...")
             all_collections = kometa_parser.parse_configs()
             if args.collection:
                 matched = [
@@ -666,8 +665,8 @@ def run_scheduled_pipeline(args: argparse.Namespace) -> int:
                     # for weeks, and stale snapshots would miss new movies and
                     # re-apply tags against day-one state
                     collections = load_collections()
-                    logger.info(f"Found {len(collections)} collections to process")
-                    logger.info("Fetching movies from Radarr")
+                    logger.debug(f"Found {len(collections)} collections to process")
+                    logger.debug("Fetching movies from Radarr")
                     all_movies = radarr_client.get_movies()
                     logger.info(f"Retrieved {len(all_movies)} movies from Radarr")
 

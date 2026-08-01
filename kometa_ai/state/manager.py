@@ -53,7 +53,7 @@ class StateManager:
                 logger.info(f"State file not found at {self.state_file}, using empty state")
                 return
 
-            logger.info(f"Loading state from {self.state_file}")
+            logger.debug(f"Loading state from {self.state_file}")
             with open(self.state_file, 'r') as f:
                 loaded_state = json.load(f)
 
@@ -81,7 +81,7 @@ class StateManager:
                 bad run rather than rotating away within a single one.
         """
         try:
-            logger.info(f"Saving state to {self.state_file}")
+            logger.debug(f"Saving state to {self.state_file}")
 
             if backup and self.state_file.exists():
                 self._create_backup()
@@ -97,7 +97,7 @@ class StateManager:
             with open(self.state_file, 'w') as f:
                 json.dump(self.state, f, indent=2)
 
-            logger.info("State saved successfully")
+            logger.debug("State saved successfully")
         except Exception as e:
             logger.error(f"Error saving state: {e}")
 
@@ -153,7 +153,7 @@ class StateManager:
             'errors': []
         }
 
-        logger.info("State reset to empty")
+        logger.debug("State reset to empty")
         self.save()
 
     def get_decision(self, movie_id: int, collection_name: str) -> Optional[DecisionRecord]:
