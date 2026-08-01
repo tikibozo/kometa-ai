@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/tikibozo/kometa-ai/compare/v0.4.2...v0.4.3) (2026-08-01)
+
+
+### Bug Fixes
+
+* make --dry-run/--collection one-shot; dry-run skips the run lock ([#26](https://github.com/tikibozo/kometa-ai/issues/26)) ([3b7214f](https://github.com/tikibozo/kometa-ai/commit/3b7214f5f357b630e1c498bd56a8ca749bc0c7e4))
+
 ## [0.4.2](https://github.com/tikibozo/kometa-ai/compare/v0.4.1...v0.4.2) (2026-07-27)
 
 
