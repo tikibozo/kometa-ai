@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/tikibozo/kometa-ai/compare/v0.4.3...v0.5.0) (2026-08-01)
+
+
+### Features
+
+* report per-collection completeness + run budget/quota status ([#28](https://github.com/tikibozo/kometa-ai/issues/28)) ([95d6829](https://github.com/tikibozo/kometa-ai/commit/95d682960234116d9aba1edf1783edd63016d889))
+
 ## [0.4.3](https://github.com/tikibozo/kometa-ai/compare/v0.4.2...v0.4.3) (2026-08-01)
 
 
