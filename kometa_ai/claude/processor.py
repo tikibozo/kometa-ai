@@ -232,7 +232,7 @@ class MovieProcessor:
             return [], [], {}
 
         threshold = collection.confidence_threshold
-        logger.info(f"Processing collection '{collection.name}' with {len(movies)} movies")
+        logger.info(f"Processing collection '{collection.name}'")
 
         current_prompt_hash = prompt_hash(collection.prompt)
 
@@ -257,7 +257,7 @@ class MovieProcessor:
                 filtered_demotions += 1
         excluded_ids.extend(filtered_ids)
         if filtered_ids:
-            logger.info(
+            logger.debug(
                 f"Candidate filter kept {len(candidates)} of {len(movies)} movies for "
                 f"'{collection.name}'; excluded {len(filtered_ids)} without a Claude call"
                 + (f" ({filtered_demotions} demoted from the collection)" if filtered_demotions else "")
