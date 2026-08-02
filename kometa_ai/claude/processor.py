@@ -388,7 +388,6 @@ class MovieProcessor:
         # Nothing to send to Claude — everything was filtered, cached, or
         # deferred. Return the current membership.
         if not movies_to_process:
-            logger.info(f"No movies need processing for collection '{collection.name}'")
             self.collection_stats[collection.name] = all_usage_stats
             included_ids = list(set(included_ids))
             excluded_ids = list(set(excluded_ids) - set(included_ids))
