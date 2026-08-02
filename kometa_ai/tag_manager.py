@@ -84,5 +84,5 @@ class TagManager:
                 "tag": tag
             })
 
-        logger.info(f"Reconciliation complete: added {len(to_add)} movies, removed {len(to_remove)} movies")
+        logger.debug(f"Reconciliation complete: added {len(to_add)} movies, removed {len(to_remove)} movies")
         return changes
