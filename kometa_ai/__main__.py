@@ -312,7 +312,7 @@ def process_collections(
                         f"Applied {len(changes)} tag changes for '{collection.name}': "
                         f"{added} added, {removed} removed")
                 else:
-                    logger.info(
+                    logger.debug(
                         f"No changes needed for collection '{collection.name}'")
 
                 results["total_changes"] = cast(int, results["total_changes"]) + len(changes)
