@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.6](https://github.com/tikibozo/kometa-ai/compare/v0.5.5...v0.5.6) (2026-08-02)
+
+
+### Bug Fixes
+
+* additional logging improvements ([95dfd16](https://github.com/tikibozo/kometa-ai/commit/95dfd16ad9e5bada36c4aa8156559ef36f8cd7c7))
+
 ## [0.5.5](https://github.com/tikibozo/kometa-ai/compare/v0.5.4...v0.5.5) (2026-08-02)
 
 
