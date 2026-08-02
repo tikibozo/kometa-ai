@@ -41,7 +41,7 @@ class TagManager:
         Returns:
             List of change dictionaries with movie_id, action, etc.
         """
-        logger.info(f"Reconciling collection membership for '{collection_name}' with tag {tag}")
+        logger.debug(f"Reconciling collection membership for '{collection_name}' with tag {tag}")
 
         tag_obj = self.radarr.get_or_create_tag(tag)
         tag_id = tag_obj.id

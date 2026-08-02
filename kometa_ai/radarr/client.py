@@ -170,7 +170,7 @@ class RadarrClient:
         response = self._make_request('GET', '/movie')
         movies_data = response.json()
 
-        logger.info(f"Fetched {len(movies_data)} movies from Radarr")
+        logger.debug(f"Fetched {len(movies_data)} movies from Radarr")
         return [Movie.from_dict(movie_data) for movie_data in movies_data]
 
     def get_movie(self, movie_id: int) -> Movie:
@@ -201,7 +201,7 @@ class RadarrClient:
         response = self._make_request('GET', '/tag')
         tags_data = response.json()
 
-        logger.info(f"Fetched {len(tags_data)} tags from Radarr")
+        logger.debug(f"Fetched {len(tags_data)} tags from Radarr")
         return [Tag.from_dict(tag_data) for tag_data in tags_data]
 
     def get_tag_by_label(self, label: str) -> Optional[Tag]:
