@@ -354,6 +354,10 @@ class MovieProcessor:
                 f"'{collection.name}' to a future run "
                 f"(MAX_EVALS_PER_RUN={self.max_evals_per_run}, {self._budget_remaining()} left this run)"
             )
+        else:
+            logger.info(
+                f"{len(pending)} pending movies to process for collection '{collection.name}'"
+            )
 
         cached_count = sum(1 for movie_id in existing_decisions if movie_id not in to_process_ids)
 
