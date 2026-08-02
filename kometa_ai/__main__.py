@@ -273,7 +273,7 @@ def process_collections(
                 collection=collection,
                 movies=all_movies
             )
-            logger.info(
+            logger.debug(
                 f"Classification complete: {len(included_ids)} movies included, "
                 f"{len(excluded_ids)} excluded")
 

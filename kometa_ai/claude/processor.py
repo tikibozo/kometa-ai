@@ -318,7 +318,7 @@ class MovieProcessor:
                     reprocess_reasons[movie.id] = reason
                     logger.debug(f"Processing movie {movie.id} ({movie.title}): {reason}")
 
-            logger.info(f"{len(pending)} of {len(candidates)} candidate movies need evaluation for collection '{collection.name}'")
+            logger.debug(f"{len(pending)} of {len(candidates)} candidate movies need evaluation for collection '{collection.name}'")
 
         # Lever 2 — prioritized, budget-capped backfill. Near-threshold
         # re-evaluations always run (the bounded anti-oscillation pass); the
@@ -388,6 +388,9 @@ class MovieProcessor:
             self.collection_stats[collection.name] = all_usage_stats
             included_ids = list(set(included_ids))
             excluded_ids = list(set(excluded_ids) - set(included_ids))
+            logger.info(
+                f"Collection '{collection.name}' processing complete: "
+                f"{len(included_ids)} included, {len(excluded_ids)} excluded")
             return included_ids, excluded_ids, all_usage_stats
 
         # Process movies in batches
@@ -402,7 +405,7 @@ class MovieProcessor:
             end_idx = min(start_idx + self.batch_size, len(movies_to_process))
             batch_movies = movies_to_process[start_idx:end_idx]
 
-            logger.info(f"Processing batch {batch_index + 1}/{num_batches} with {len(batch_movies)} movies")
+            logger.info(f"Sending Claude batch {batch_index + 1}/{num_batches} with {len(batch_movies)} movies")
 
             # Format movie data for this batch, anchoring re-evaluations to
             # their previous decision (ignored on force refresh, and on a
