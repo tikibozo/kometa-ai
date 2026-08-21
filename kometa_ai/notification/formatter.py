@@ -142,9 +142,7 @@ class NotificationFormatter:
             name_w = max(10, max(len(name) for name, _, _ in rows))
             lines.append(f"{'Collection'.ljust(name_w)}   Added  Removed")
             for name, a, r in rows:
-                a_txt = f"+{a}" if a else "0"
-                r_txt = f"-{r}" if r else "0"
-                lines.append(f"{name.ljust(name_w)}   {a_txt.rjust(5)}  {r_txt.rjust(7)}")
+                lines.append(f"{name.ljust(name_w)}   {str(a).rjust(5)}  {str(r).rjust(7)}")
             lines.append("")
 
         # Collection status — completeness / backfill backlog
@@ -243,9 +241,9 @@ class NotificationFormatter:
                 f'<th align="right" style="border-bottom:2px solid {_BORDER};">Added</th>'
                 f'<th align="right" style="border-bottom:2px solid {_BORDER};">Removed</th></tr>')
             for name, a, r in rows:
-                a_html = (f'<span style="color:{_GREEN};">+{a}</span>' if a
+                a_html = (f'<span style="color:{_GREEN};">{a}</span>' if a
                           else f'<span style="color:{_ZERO};">0</span>')
-                r_html = (f'<span style="color:{_RED};">-{r}</span>' if r
+                r_html = (f'<span style="color:{_RED};">{r}</span>' if r
                           else f'<span style="color:{_ZERO};">0</span>')
                 p.append(
                     f'<tr><td style="border-bottom:1px solid {_BORDER};">{esc(name)}</td>'
