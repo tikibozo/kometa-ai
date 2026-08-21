@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.9](https://github.com/tikibozo/kometa-ai/compare/v0.5.8...v0.5.9) (2026-08-21)
+
+
+### Bug Fixes
+
+* **docker:** apt-get upgrade + drop pip in the final stage ([#40](https://github.com/tikibozo/kometa-ai/issues/40)) ([27568e5](https://github.com/tikibozo/kometa-ai/commit/27568e5849f3ef09a78bac31a1eca4b4ef97e7d9))
+
 ## [0.5.8](https://github.com/tikibozo/kometa-ai/compare/v0.5.7...v0.5.8) (2026-08-21)
 
 
