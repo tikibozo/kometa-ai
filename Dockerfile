@@ -27,8 +27,11 @@ LABEL maintainer="Kometa-AI Team" \
       description="AI-powered movie collection manager for Radarr and Kometa"
 
 # Install gosu for dropping privileges, plus curl/ca-certificates for the
-# optional Claude Code CLI install below
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# optional Claude Code CLI install below.
+# `apt-get upgrade` matters: the base tag lags fresh Debian security fixes
+# between Docker's periodic rebuilds, so without it a rebuild ships known-CVE OS
+# packages and the scheduled Trivy re-scan of :latest goes red.
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     gosu \
     curl \
     ca-certificates \
@@ -44,8 +47,14 @@ WORKDIR /app
 COPY --from=builder /wheels /wheels
 
 # Install dependencies
+# Remove pip after installing. Nothing runs pip at runtime (the entrypoint
+# installs the Claude CLI via curl, and the app itself never shells out to pip),
+# and pip 26.2+ ships a CycloneDX SBOM of its vendored dependencies at
+# pip/_vendor/bom.cdx.json which scanners read as installed software — blocking
+# the Trivy gate on CVEs in packages this project does not depend on.
 RUN pip install --no-cache-dir --no-index --find-links=/wheels/ /wheels/* \
-    && rm -rf /wheels
+    && rm -rf /wheels \
+    && python -m pip uninstall -y pip
 
 # Copy application code
 COPY --chown=kometa:kometa . .
