@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.8](https://github.com/tikibozo/kometa-ai/compare/v0.5.7...v0.5.8) (2026-08-21)
+
+
+### Bug Fixes
+
+* drop +/- signs from report summary table counts ([#41](https://github.com/tikibozo/kometa-ai/issues/41)) ([34f07fe](https://github.com/tikibozo/kometa-ai/commit/34f07fee3f22d87af2586e86ffc2af1779ee96ae))
+
 ## [0.5.7](https://github.com/tikibozo/kometa-ai/compare/v0.5.6...v0.5.7) (2026-08-02)
 
 
