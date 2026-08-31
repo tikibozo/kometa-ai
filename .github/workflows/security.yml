@@ -7,6 +7,7 @@ on:
     branches: [main]
   schedule:
     - cron: "17 6 * * 1" # weekly re-scan of the published image
+  workflow_dispatch: # manual re-scan (runs the same scan → rebuild → verify path)
 
 permissions:
   contents: read
@@ -14,7 +15,7 @@ permissions:
 jobs:
   gitleaks:
     name: gitleaks
-    if: github.event_name != 'schedule'
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -24,13 +25,56 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Schedule-only: never add this job to required checks (it is skipped on PRs)
+  # Schedule-only: never add the jobs below to required checks (they are skipped on PRs)
   trivy-published:
     name: Trivy re-scan of published image
-    if: github.event_name == 'schedule'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    outputs:
+      findings: ${{ steps.scan.outcome == 'failure' }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Scan tikibozo/kometa-ai:latest
+        id: scan
+        # Findings don't fail the run here; they trigger the Trivy-gated
+        # rebuild below. The run only goes red if the rebuild can't clear them.
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: tikibozo/kometa-ai:latest
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Resolve current release version
+        id: version
+        if: steps.scan.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+  # Fixable CVEs in the published image (new CVEs in unchanged base-image
+  # packages, which Renovate structurally can't see) are cleared by rebuilding
+  # main at the current version: apt-get upgrade pulls the patched packages,
+  # and the build's own Trivy gate blocks the push if the fix isn't actually
+  # available upstream yet.
+  rebuild:
+    name: Auto-rebuild on findings
+    needs: trivy-published
+    if: needs.trivy-published.outputs.findings == 'true'
+    uses: ./.github/workflows/docker-build.yml
+    with:
+      version: ${{ needs.trivy-published.outputs.version }}
+    secrets: inherit
+
+  verify:
+    name: Verify rebuilt image
+    needs: [trivy-published, rebuild]
+    if: needs.trivy-published.outputs.findings == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Re-scan tikibozo/kometa-ai:latest
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: tikibozo/kometa-ai:latest
