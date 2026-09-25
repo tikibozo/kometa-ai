@@ -5,7 +5,7 @@ deterministic batching, and previous-decision anchoring."""
 import json
 import pytest
 
-from kometa_ai.claude.processor import MovieProcessor, MAX_REVISIONS
+from kometa_ai.claude.processor import MovieProcessor, MAX_REVISIONS, prompt_hash
 from kometa_ai.kometa.models import CollectionConfig
 from kometa_ai.radarr.models import Movie
 from kometa_ai.state.manager import StateManager
@@ -401,3 +401,54 @@ class TestPromptHash:
         included, excluded, _ = run(client, state_manager, self._coll("criteria B"), [movie])
         assert included == []
         assert excluded == [1]
+
+
+class TestPerCollectionMetadataChange:
+    def test_metadata_change_reevaluates_every_collection(
+            self, client, state_manager):
+        """A metadata change must re-open the movie in EVERY collection, not
+        just the first one processed in the run. The per-movie hash on the
+        state record is overwritten by each decision write, so comparing
+        against it hid the change from every later collection."""
+        first = CollectionConfig(name="First", slug="first", enabled=True,
+                                 prompt="First criteria", confidence_threshold=0.7)
+        second = CollectionConfig(name="Second", slug="second", enabled=True,
+                                  prompt="Second criteria", confidence_threshold=0.7)
+        movie = make_movie(1)
+        client.script[1] = (True, 0.95)
+
+        # Both collections judge the movie once.
+        run(client, state_manager, first, [movie])
+        run(client, state_manager, second, [movie])
+        assert len(client.batches) == 2
+
+        # Metadata changes (e.g. TMDB genre refresh).
+        movie.genres = ["Comedy", "Romance"]
+        run(client, state_manager, first, [movie])
+        assert len(client.batches) == 3  # first collection re-evaluates
+
+        run(client, state_manager, second, [movie])
+        assert len(client.batches) == 4, (
+            "second collection must also re-evaluate the changed movie")
+
+        # Both records now carry the new hash; nothing is re-sent next run.
+        run(client, state_manager, first, [movie])
+        run(client, state_manager, second, [movie])
+        assert len(client.batches) == 4
+
+    def test_legacy_record_without_hash_falls_back_to_movie_hash(
+            self, client, state_manager, collection):
+        from datetime import datetime, UTC
+        from kometa_ai.state.models import DecisionRecord
+        movie = make_movie(1)
+        client.script[1] = (True, 0.95)
+        # Legacy record: no per-collection hash, but the per-movie hash matches.
+        state_manager.set_decision(DecisionRecord(
+            movie_id=1, collection_name=collection.name, include=True,
+            confidence=0.95, metadata_hash=movie.calculate_metadata_hash(),
+            tag="KAI-test", timestamp=datetime.now(UTC).isoformat(),
+            prompt_hash=prompt_hash(collection.prompt)))
+        state_manager.state["decisions"]["movie:1"]["collections"][collection.name]["metadata_hash"] = ""
+
+        run(client, state_manager, collection, [movie])
+        assert client.batches == []  # unchanged movie is not re-sent
