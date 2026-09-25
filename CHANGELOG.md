@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.10](https://github.com/tikibozo/kometa-ai/compare/v0.5.9...v0.5.10) (2026-09-25)
+
+
+### Bug Fixes
+
+* re-evaluate metadata changes in every collection, not just the first ([#45](https://github.com/tikibozo/kometa-ai/issues/45)) ([cadf836](https://github.com/tikibozo/kometa-ai/commit/cadf836bff0f5d7739ff0f6e3026f3f1138ccd9f))
+
 ## [0.5.9](https://github.com/tikibozo/kometa-ai/compare/v0.5.8...v0.5.9) (2026-08-21)
 
 
