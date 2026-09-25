@@ -297,8 +297,16 @@ class MovieProcessor:
             #    re-evaluation budget (MAX_REVISIONS)
             for movie in candidates:
                 current_hash = self._metadata_hash(movie)
-                stored_hash = self.state_manager.get_metadata_hash(movie.id)
                 decision = existing_decisions.get(movie.id)
+                # Compare against THIS collection's decision hash, not the
+                # per-movie hash on the state record. The per-movie hash is
+                # overwritten by every decision write, so once the first
+                # collection in a run re-evaluates a changed movie the rest
+                # would see "unchanged" and keep their stale verdicts. A legacy
+                # record with no per-collection hash falls back to the
+                # per-movie one.
+                stored_hash = (decision.metadata_hash if decision and decision.metadata_hash
+                               else self.state_manager.get_metadata_hash(movie.id))
 
                 reason = None
 
