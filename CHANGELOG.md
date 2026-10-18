@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.11](https://github.com/tikibozo/kometa-ai/compare/v0.5.10...v0.5.11) (2026-10-18)
+
+
+### Bug Fixes
+
+* **deps:** update python docker tag to v3.15 ([#48](https://github.com/tikibozo/kometa-ai/issues/48)) ([c053fda](https://github.com/tikibozo/kometa-ai/commit/c053fdac0cd11067dccc16a63886bf7d5d6d4a91))
+
 ## [0.5.10](https://github.com/tikibozo/kometa-ai/compare/v0.5.9...v0.5.10) (2026-09-25)
 
 
