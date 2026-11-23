@@ -41,7 +41,12 @@ jobs:
           context: .
           load: true
           tags: kometa-ai:scan
-          cache-from: type=registry,ref=tikibozo/kometa-ai:buildcache
+          # No registry/GHA layer cache, on purpose: a cached `apt-get upgrade` /
+          # `apk upgrade` / `pip install` layer is keyed on the base-image digest,
+          # so it is replayed with stale packages until the base tag is
+          # republished, and the weekly self-heal rebuild then republishes the same
+          # vulnerable image. The multi-arch step still reuses this step's amd64
+          # layers from the in-job buildx builder.
 
       - name: Trivy gate (HIGH/CRITICAL block the release)
         uses: aquasecurity/trivy-action@v0.36.0
@@ -65,5 +70,3 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.tags.outputs.tags }}
-          cache-from: type=registry,ref=tikibozo/kometa-ai:buildcache
-          cache-to: type=registry,ref=tikibozo/kometa-ai:buildcache,mode=max
