@@ -6,7 +6,9 @@
   "automerge": true,
   "platformAutomerge": true,
   "automergeStrategy": "squash",
-  "dependencyDashboard": true,
+  "dependencyDashboard": {
+    "enabled": true
+  },
   "labels": ["renovate"],
   "packageRules": [
     {
